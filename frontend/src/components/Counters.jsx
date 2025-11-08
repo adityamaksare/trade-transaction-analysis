@@ -1,28 +1,15 @@
 import React from 'react';
 
-interface Stats {
-  total: number;
-  legit: number;
-  fraud: number;
-}
-
-interface CountersProps {
-  stats: Stats;
-  onTotalClick?: () => void;
-  onLegitClick?: () => void;
-  onFraudClick?: () => void;
-}
-
-const Counters: React.FC<CountersProps> = ({ stats, onTotalClick, onLegitClick, onFraudClick }) => {
-  const fraudPercentage = stats.total > 0 
-    ? ((stats.fraud / stats.total) * 100).toFixed(1) 
+const Counters = ({ stats, onTotalClick, onLegitClick, onFraudClick }) => {
+  const fraudPercentage = stats.total > 0
+    ? ((stats.fraud / stats.total) * 100).toFixed(1)
     : '0.0';
 
-  const legitPercentage = stats.total > 0 
-    ? ((stats.legit / stats.total) * 100).toFixed(1) 
+  const legitPercentage = stats.total > 0
+    ? ((stats.legit / stats.total) * 100).toFixed(1)
     : '0.0';
 
-  const cardStyle = (gradient: string) => ({
+  const cardStyle = (gradient) => ({
     background: `linear-gradient(135deg, ${gradient})`,
     border: 'none',
     borderRadius: '16px',
@@ -41,7 +28,7 @@ const Counters: React.FC<CountersProps> = ({ stats, onTotalClick, onLegitClick, 
     <div className="row g-4 mb-4">
       {/* Total Transactions Card */}
       <div className="col-md-4">
-        <div 
+        <div
           className="card h-100 text-center text-white"
           style={cardStyle('rgba(67, 97, 238, 0.3), rgba(64, 224, 208, 0.3)')}
           onClick={onTotalClick}
@@ -70,7 +57,7 @@ const Counters: React.FC<CountersProps> = ({ stats, onTotalClick, onLegitClick, 
 
       {/* Legitimate Transactions Card */}
       <div className="col-md-4">
-        <div 
+        <div
           className="card h-100 text-center text-white"
           style={cardStyle('rgba(46, 213, 115, 0.3), rgba(0, 184, 148, 0.3)')}
           onClick={onLegitClick}
@@ -100,7 +87,7 @@ const Counters: React.FC<CountersProps> = ({ stats, onTotalClick, onLegitClick, 
 
       {/* Fraudulent Transactions Card */}
       <div className="col-md-4">
-        <div 
+        <div
           className="card h-100 text-center text-white"
           style={cardStyle('rgba(255, 71, 87, 0.3), rgba(255, 99, 132, 0.3)')}
           onClick={onFraudClick}

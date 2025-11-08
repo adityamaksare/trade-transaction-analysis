@@ -7,6 +7,13 @@ class Config:
     KAFKA_TOPIC: str = os.getenv("KAFKA_TOPIC", "transactions")
     KAFKA_DLQ_TOPIC: str = os.getenv("KAFKA_DLQ_TOPIC", "transactions_dlq")
     KAFKA_GROUP_ID: str = os.getenv("KAFKA_GROUP_ID", "fraud-detector-group")
+
+    # Spark Configuration
+    SPARK_APP_NAME: str = os.getenv("SPARK_APP_NAME", "FraudDetectionStreaming")
+    SPARK_MASTER: str = os.getenv("SPARK_MASTER", "local[*]")
+    SPARK_CHECKPOINT_DIR: str = os.getenv("SPARK_CHECKPOINT_DIR", "./spark-checkpoint")
+    SPARK_KAFKA_OFFSET: str = os.getenv("SPARK_KAFKA_OFFSET", "earliest")  # earliest or latest
+    SPARK_TRIGGER_INTERVAL: str = os.getenv("SPARK_TRIGGER_INTERVAL", "1 second")
     
     # MongoDB Configuration
     MONGO_URI: str = os.getenv("MONGO_URI", "mongodb://localhost:27017")

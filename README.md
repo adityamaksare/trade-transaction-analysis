@@ -1,130 +1,163 @@
-# 🔍 Real-Time Stock Market Fraud Detection System
+# 🔍 AI-Powered Real-Time Stock Fraud Detection System
 
-An intelligent, real-time fraud detection system for stock market transactions using **AI-powered classification** with Llama3 LLM, event streaming with Kafka, and live visualization through WebSockets.
+A production-grade, real-time fraud detection system for Indian stock market transactions using **Llama3 AI**, **PySpark Structured Streaming**, **Apache Kafka**, and **React**. Watch live as AI classifies transactions with 95%+ confidence in under 500ms.
+
+<div align="center">
+
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
+[![PySpark](https://img.shields.io/badge/PySpark-3.5.0-orange.svg)](https://spark.apache.org/)
+[![React](https://img.shields.io/badge/React-18.2.0-61DAFB.svg)](https://reactjs.org/)
+[![Kafka](https://img.shields.io/badge/Kafka-7.5.0-black.svg)](https://kafka.apache.org/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Latest-green.svg)](https://www.mongodb.com/)
+[![Llama3](https://img.shields.io/badge/Llama3-8B-purple.svg)](https://llama.meta.com/)
+
+</div>
 
 ---
 
 ## 📋 Table of Contents
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Key Features](#key-features)
-- [Technology Stack](#technology-stack)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Project Structure](#project-structure)
-- [How It Works](#how-it-works)
-- [API Documentation](#api-documentation)
-- [Configuration](#configuration)
-- [Database Schema](#database-schema)
-- [Development](#development)
-- [Troubleshooting](#troubleshooting)
-- [Performance](#performance)
-- [License](#license)
+- [Overview](#-overview)
+- [Live Demo](#-live-demo)
+- [Architecture](#-architecture)
+- [Key Features](#-key-features)
+- [Technology Stack](#-technology-stack)
+- [Quick Start](#-quick-start)
+- [Project Structure](#-project-structure)
+- [How It Works](#-how-it-works)
+- [API Reference](#-api-reference)
+- [Configuration](#-configuration)
+- [Development](#-development)
+- [Performance](#-performance)
+- [Troubleshooting](#-troubleshooting)
+- [Author](#-author)
 
 ---
 
 ## 🎯 Overview
 
-This system simulates and detects fraudulent stock transactions in real-time for the **Indian National Stock Exchange (NSE)**. It combines modern streaming architecture with AI-powered fraud detection to provide instant classification of transactions as legitimate or fraudulent.
-
 ### What Does It Do?
 
-1. **Generates** realistic stock market transactions for 15 Indian stocks (RELIANCE, TCS, INFY, etc.)
-2. **Streams** transactions through Apache Kafka for scalable processing
-3. **Classifies** each transaction using Llama3 LLM with confidence scores and reasoning
-4. **Stores** all classifications in MongoDB with performance metadata
-5. **Broadcasts** real-time updates to a React dashboard via WebSockets
-6. **Visualizes** fraud patterns with interactive charts and filters
+This system simulates and detects fraudulent stock transactions in **real-time** for the **Indian National Stock Exchange (NSE)**. It combines modern streaming architecture with AI-powered fraud detection to provide instant classification of transactions.
+
+**The Complete Flow:**
+1. **Generates** realistic NSE stock transactions (RELIANCE, TCS, INFY, etc.) with intentional fraud patterns (~25%)
+2. **Streams** transactions through Apache Kafka for scalable message delivery
+3. **Processes** with PySpark Structured Streaming in 1-second micro-batches
+4. **Classifies** using Llama3 (8B parameters) with few-shot prompting
+5. **Stores** in MongoDB with performance metadata (latency, confidence, retries)
+6. **Broadcasts** real-time updates to React dashboard via WebSocket
+7. **Visualizes** fraud patterns with interactive filters and confidence scores
 
 ### Use Cases
 
-- **Educational**: Learn event-driven architecture and AI integration
-- **Demonstration**: Showcase real-time fraud detection capabilities
-- **Research**: Experiment with LLM-based classification
-- **Development**: Template for building production fraud detection systems
+- **Educational**: Learn event-driven architecture, stream processing, and AI integration
+- **Demonstration**: Showcase real-time fraud detection capabilities to stakeholders
+- **Research**: Experiment with LLM-based classification and prompt engineering
+- **Development**: Production-ready template for building fraud detection systems
+
+---
+
+## 🎥 Live Demo
+
+**What You'll See:**
+
+- **Real-time Statistics**: Total, Legitimate, and Fraudulent transaction counters updating every 15 seconds
+- **Live Transaction Stream**: New transactions appearing instantly with AI classifications
+- **Color-coded Rows**: Green for legitimate (✅), Red for fraudulent (⚠️)
+- **Confidence Scores**: AI confidence levels (0-100%)
+- **Reasoning**: Why each transaction was classified as fraud or legit
+- **Interactive Filters**: Click cards or dropdown to filter by fraud/legit/all
 
 ---
 
 ## 🏗️ Architecture
 
-### System Architecture Diagram
+### System Architecture
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                    FRAUD DETECTION SYSTEM ARCHITECTURE                        │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    FRAUD DETECTION SYSTEM ARCHITECTURE                       │
+└─────────────────────────────────────────────────────────────────────────────┘
 
-┌─────────────────┐         ┌──────────────────────────────────────┐
-│   PRODUCER      │         │         BACKEND SERVICES             │
-│                 │         │                                      │
-│  Transaction    │  Kafka  │  ┌────────────────────────────┐    │
-│  Generator      │─Stream─>│  │  Flask API + SocketIO      │    │
-│                 │         │  │  (app.py)                  │    │
-│  - 15 NSE       │         │  └────────────────────────────┘    │
-│    Stocks       │         │              ↓                      │
-│  - Random       │         │  ┌────────────────────────────┐    │
-│    Quantities   │         │  │  Kafka Consumer            │    │
-│  - Price        │         │  │  (consumer.py)             │    │
-│    Variations   │         │  │  - Retry Logic             │    │
-│                 │         │  │  - Deduplication           │    │
-│  Every 30s      │         │  │  - DLQ Handling           │    │
-└─────────────────┘         │  └────────────────────────────┘    │
-                            │              ↓                      │
-                            │  ┌────────────────────────────┐    │
-                            │  │  LLM Classifier            │    │
-                            │  │  (llm_chain.py)            │    │
-                            │  │  - Llama3 via Ollama       │    │
-                            │  │  - Few-shot Prompting      │    │
-                            │  │  - Binary Classification   │    │
-                            │  └────────────────────────────┘    │
-                            │              ↓                      │
-                            │  ┌────────────────────────────┐    │
-                            │  │  MongoDB Client            │    │
-                            │  │  (db.py)                   │    │
-                            │  │  - Atomic Updates          │    │
-                            │  │  - Indexed Queries         │    │
-                            │  └────────────────────────────┘    │
-                            └──────────────────────────────────────┘
-                                          ↓ WebSocket
-                            ┌──────────────────────────────────────┐
-                            │       FRONTEND (React)               │
-                            │                                      │
-                            │  ┌────────────────────────────┐    │
-                            │  │  Dashboard                  │    │
-                            │  │  - Real-time Counters       │    │
-                            │  │  - Transaction Table        │    │
-                            │  │  - Filtering                │    │
-                            │  └────────────────────────────┘    │
-                            └──────────────────────────────────────┘
+┌──────────────────┐         ┌────────────────────────────────────────────┐
+│   PRODUCER       │         │         BACKEND SERVICES                   │
+│                  │         │                                            │
+│  Transaction     │  Kafka  │  ┌──────────────────────────────────┐    │
+│  Generator       │─Stream─>│  │  Flask API + SocketIO            │    │
+│                  │         │  │  - REST API (port 5001)          │    │
+│  • 15 NSE Stocks │         │  │  - WebSocket Broadcasting        │    │
+│  • Realistic     │         │  │  - CORS Enabled                  │    │
+│    Price Ranges  │         │  └──────────────────────────────────┘    │
+│  • Fraud         │         │                ↓                          │
+│    Patterns      │         │  ┌──────────────────────────────────┐    │
+│  • Every 15s     │         │  │  PySpark Streaming Consumer      │    │
+│                  │         │  │  - 1-second micro-batches        │    │
+│                  │         │  │  - Automatic checkpointing       │    │
+└──────────────────┘         │  │  - Retry logic (3 attempts)      │    │
+                             │  │  - Deduplication tracking        │    │
+                             │  └──────────────────────────────────┘    │
+                             │                ↓                          │
+                             │  ┌──────────────────────────────────┐    │
+                             │  │  LLM Fraud Classifier            │    │
+                             │  │  - Llama3 (8B) via Ollama        │    │
+                             │  │  - Few-shot prompting            │    │
+                             │  │  - Binary classification         │    │
+                             │  │  - Latency: 200-500ms            │    │
+                             │  └──────────────────────────────────┘    │
+                             │                ↓                          │
+                             │  ┌──────────────────────────────────┐    │
+                             │  │  MongoDB Client                  │    │
+                             │  │  - Dynamic stats calculation     │    │
+                             │  │  - Indexed queries (processed_at)│    │
+                             │  │  - Atomic upserts                │    │
+                             │  └──────────────────────────────────┘    │
+                             └────────────────────────────────────────────┘
+                                           ↓ WebSocket
+                             ┌────────────────────────────────────────────┐
+                             │       FRONTEND (React + JavaScript)        │
+                             │                                            │
+                             │  ┌──────────────────────────────────┐    │
+                             │  │  Real-time Dashboard             │    │
+                             │  │  - Live counters with %          │    │
+                             │  │  - Transaction history table     │    │
+                             │  │  - Filtering (all/legit/fraud)   │    │
+                             │  │  - Duplicate prevention          │    │
+                             │  │  - Filter-aware WebSocket        │    │
+                             │  └──────────────────────────────────┘    │
+                             └────────────────────────────────────────────┘
 
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                          EXTERNAL SERVICES                                    │
-├──────────────────┬──────────────────┬──────────────────┬───────────────────┤
-│   Kafka          │   ZooKeeper      │   MongoDB        │   Ollama Llama3   │
-│   (Confluent)    │   (Confluent)    │   (Database)     │   (LLM Engine)    │
-│   Port: 9092     │   Port: 2181     │   Port: 27017    │   Port: 11434     │
-└──────────────────┴──────────────────┴──────────────────┴───────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          EXTERNAL SERVICES                                   │
+├──────────────────┬──────────────────┬──────────────────┬──────────────────┤
+│   Kafka          │   ZooKeeper      │   MongoDB        │   Ollama Llama3  │
+│   (Confluent)    │   (Confluent)    │   (Database)     │   (LLM Engine)   │
+│   Port: 9092     │   Port: 2181     │   Port: 27017    │   Port: 11434    │
+└──────────────────┴──────────────────┴──────────────────┴──────────────────┘
 ```
 
 ### Data Flow
 
 ```
-1. Producer generates transaction → TX00000001 (RELIANCE, 75000 shares, ₹8500)
-                    ↓
-2. Kafka streams to topic "transactions"
-                    ↓
-3. Consumer polls and validates with Pydantic
-                    ↓
-4. LLM analyzes: "Unusually large quantity suggests fraud"
-                    ↓
-5. Classification: { label: "fraud", confidence: 0.95, reason: "..." }
-                    ↓
-6. MongoDB stores: trade_classifications collection + update stats
-                    ↓
-7. WebSocket broadcasts to frontend
-                    ↓
-8. Dashboard updates in <280ms: Counters + Table refresh
+Producer generates transaction
+  ↓
+  TX00000001: RELIANCE, 75000 shares @ ₹6,800 (buy)
+  ↓
+Kafka streams to topic "transactions"
+  ↓
+PySpark reads in 1-second micro-batch
+  ↓
+Validates with Pydantic schema
+  ↓
+LLM analyzes: "Price 2.5x typical range + large quantity = pump scheme"
+  ↓
+Classification: { label: "fraud", confidence: 0.95, reason: "..." }
+  ↓
+MongoDB stores + dynamic stats update
+  ↓
+WebSocket broadcasts to frontend
+  ↓
+Dashboard updates: Counters + New row in table (red border)
 ```
 
 ---
@@ -132,45 +165,76 @@ This system simulates and detects fraudulent stock transactions in real-time for
 ## ✨ Key Features
 
 ### 🤖 AI-Powered Fraud Detection
-- **Llama3 LLM** via Ollama for intelligent classification
-- **Few-shot prompting** with domain-specific fraud indicators
+
+- **Llama3 (8B)** via Ollama for intelligent classification
+- **Few-shot prompting** with NSE-specific fraud indicators
 - **Binary classification** (fraud/legit) with confidence scores (0-1)
-- **Contextual reasoning** for each classification
-- **Automatic fallback** on LLM errors
+- **Contextual reasoning** explaining each decision
+- **Price range validation** for all 15 NSE stocks
+- **Automatic fallback** to "legit" on LLM errors
 
-### 🔄 Robust Message Processing
-- **Automatic retry** with exponential backoff (2s → 4s → 8s)
-- **Dead Letter Queue (DLQ)** for failed messages
-- **Deduplication** using trade_id tracking
-- **Manual offset commits** for reliability
-- **Transaction validation** with Pydantic schemas
+**Fraud Detection Rules:**
+1. **Pump Scheme**: Price >4x typical range (e.g., INFY @ ₹6,400+ when range is ₹1,400-1,600)
+2. **Wash Trading**: Price <0.4x typical AND quantity >70,000
+3. **Market Manipulation**: Quantity >85,000 AND price >3.5x OR <0.4x typical
 
-### 📊 Live Dashboard
-- **Real-time WebSocket updates** (<300ms latency)
-- **Interactive statistics cards** with percentages
-- **Color-coded transaction table** (green=legit, red=fraud)
-- **Filtering** by fraud/legit status
-- **Pagination** for historical data
-- **Modern UI** with gradients and animations
+### 🔄 Robust Stream Processing (PySpark)
+
+- **1-second micro-batches** for near-real-time processing
+- **Structured Streaming** with Kafka connector (auto-downloads JARs)
+- **Automatic checkpointing** at `./spark-checkpoint/` for fault tolerance
+- **Exponential backoff retry** (2s → 4s → 8s, max 3 retries)
+- **Deduplication** by trade_id to prevent duplicate processing
+- **Dead Letter Queue** logging for failed transactions
+
+### 📊 Modern React Dashboard
+
+- **Real-time WebSocket updates** (<500ms latency)
+- **Interactive statistics cards** (click to filter transactions)
+- **Color-coded table** with hover effects
+- **Filter-aware WebSocket** (only shows matching transactions)
+- **Duplicate prevention** (checks trade_id before adding)
+- **Fetches ALL transactions** (up to 10,000 limit)
+- **Mumbai timezone** display for processed_at
+- **Pure JavaScript** implementation (no TypeScript overhead)
 
 ### ⚡ Scalable Architecture
-- **Kafka** for horizontal scalability and fault tolerance
-- **MongoDB** with optimized indexes for fast queries
+
+- **PySpark** enables scaling from local (laptop) to distributed cluster without code changes
+- **Kafka** provides horizontal scalability and fault tolerance
+- **MongoDB** with optimized indexes on `processed_at` and `llama_result.label`
 - **Containerized microservices** via Docker
-- **Stateless backend** for easy scaling
-- **Health checks** for all services
+- **Health checks** for all services (ZooKeeper, Kafka, MongoDB, Backend)
+- **Dynamic stats calculation** ensures data consistency
 
 ### 📈 Performance Tracking
-- **LLM latency** measurement (~200-500ms)
-- **End-to-end latency** tracking
-- **Retry count** metadata
-- **Transaction throughput** monitoring
+
+- **LLM latency** measurement (~200-500ms per transaction)
+- **End-to-end latency** from Kafka to dashboard
+- **Retry count** metadata for monitoring
+- **Batch processing** metrics in Spark UI (http://localhost:4040)
 
 ### 🇮🇳 Indian Stock Market Focus
-- **15 NSE stock symbols** (RELIANCE, TCS, HDFCBANK, INFY, etc.)
-- **Realistic price ranges** in Indian Rupees (₹)
-- **Market-specific fraud patterns**
-- **Local timestamp** handling
+
+**15 NSE Stocks with Realistic Price Ranges (₹):**
+
+| Symbol | Company | Typical Range |
+|--------|---------|---------------|
+| RELIANCE | Reliance Industries | ₹2,400-2,800 |
+| TCS | Tata Consultancy Services | ₹3,500-4,000 |
+| HDFCBANK | HDFC Bank | ₹1,500-1,700 |
+| INFY | Infosys | ₹1,400-1,600 |
+| ICICIBANK | ICICI Bank | ₹900-1,100 |
+| HINDUNILVR | Hindustan Unilever | ₹2,300-2,600 |
+| BHARTIARTL | Bharti Airtel | ₹800-1,000 |
+| ITC | ITC Limited | ₹400-450 |
+| SBIN | State Bank of India | ₹550-650 |
+| LT | Larsen & Toubro | ₹3,200-3,600 |
+| BAJFINANCE | Bajaj Finance | ₹6,500-7,500 |
+| ASIANPAINT | Asian Paints | ₹2,800-3,200 |
+| MARUTI | Maruti Suzuki | ₹10,000-12,000 |
+| TITAN | Titan Company | ₹3,000-3,400 |
+| WIPRO | Wipro | ₹400-500 |
 
 ---
 
@@ -180,87 +244,92 @@ This system simulates and detects fraudulent stock transactions in real-time for
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **Python** | 3.11+ | Primary language |
-| **Flask** | 3.0.0 | Web framework |
-| **Flask-SocketIO** | 5.3.5 | WebSocket support |
-| **Kafka-Python** | 2.0.2 | Kafka client |
-| **PyMongo** | 4.6.1 | MongoDB driver |
-| **Pydantic** | 2.5.3 | Data validation |
-| **LangChain** | 0.1.0 | LLM framework |
+| Python | 3.11+ | Core language |
+| PySpark | 3.5.0 | Distributed stream processing |
+| Flask | 3.0.0 | Web framework |
+| Flask-SocketIO | 5.3.5 | WebSocket support |
+| Kafka-Python | 2.0.2 | Kafka producer |
+| PyMongo | 4.6.1 | MongoDB driver |
+| Pydantic | 2.5.3 | Data validation |
+| LangChain | 0.1.0 | LLM framework |
+| Java | 21 | PySpark JVM runtime |
 
 ### Frontend
 
 | Technology | Version | Purpose |
 |------------|---------|---------|
-| **React** | 18.2.0 | UI library |
-| **TypeScript** | 4.9.5 | Type safety |
-| **Socket.IO Client** | 4.6.1 | WebSocket client |
-| **React Scripts** | 5.0.1 | Build tools |
+| React | 18.2.0 | UI library |
+| JavaScript | ES6+ | Core language (converted from TypeScript) |
+| Socket.IO Client | 4.6.1 | WebSocket client |
+| React Scripts | 5.0.1 | Build tooling |
+| Bootstrap | 5.3.2 (CDN) | UI styling |
 
 ### Infrastructure
 
 | Service | Version | Purpose |
 |---------|---------|---------|
-| **Kafka** | 7.5.0 (Confluent) | Message broker |
-| **ZooKeeper** | Latest (Confluent) | Kafka coordination |
-| **MongoDB** | Latest | NoSQL database |
-| **Ollama** | Latest | LLM inference engine |
-| **Docker** | Latest | Containerization |
-| **Docker Compose** | Latest | Orchestration |
+| Kafka | 7.5.0 (Confluent) | Message broker |
+| ZooKeeper | Latest (Confluent) | Kafka coordination |
+| MongoDB | Latest | NoSQL database |
+| Ollama | Latest | LLM inference engine |
+| Docker | Latest | Containerization |
 
 ### AI Model
 
-- **Llama3:8b** - Meta's 8 billion parameter LLM for fraud classification
-
----
-
-## 📦 Prerequisites
-
-Before running the system, ensure you have:
-
-1. **Docker Desktop** - For running backend infrastructure
-   - Download: https://www.docker.com/products/docker-desktop
-
-2. **Ollama with Llama3** - Running locally on your machine
-   ```bash
-   # Install Ollama
-   brew install ollama  # macOS
-
-   # Pull Llama3 model (~4.7GB)
-   ollama pull llama3:8b
-
-   # Verify
-   ollama list
-   ```
-
-3. **Node.js 16+** - For running the frontend
-   ```bash
-   node --version  # Should be 16.0.0 or higher
-   ```
+- **Llama3:8b** - Meta's 8 billion parameter LLM (~4.7GB)
 
 ---
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+1. **Docker Desktop** - For backend infrastructure
+   ```bash
+   # Download: https://www.docker.com/products/docker-desktop
+   docker --version  # Should show Docker version
+   ```
+
+2. **Ollama with Llama3** - Running on host machine
+   ```bash
+   # Install Ollama (macOS)
+   brew install ollama
+
+   # Pull Llama3 model (~4.7GB download)
+   ollama pull llama3:8b
+
+   # Verify
+   ollama list | grep llama3
+   ```
+
+3. **Node.js 16+** - For frontend
+   ```bash
+   node --version  # Should be v16.0.0 or higher
+   ```
+
 ### Step 1: Start Ollama
 
-Open Terminal 1:
+**Terminal 1:**
 ```bash
 ollama serve
 ```
 
-Keep this terminal running.
+Keep this terminal running. You should see:
+```
+Ollama server listening on http://127.0.0.1:11434
+```
 
----
+### Step 2: Start Backend Services
 
-### Step 2: Start Backend Infrastructure
-
-Open Terminal 2:
+**Terminal 2:**
 ```bash
 # Navigate to project directory
-cd "/path/to/Live-stock-trade-transactions-fraud-detection-solution"
+cd /path/to/Live-stock-trade-transactions-fraud-detection-solution
 
-# Start all backend services (Kafka, MongoDB, Backend, Producer)
+# Make startup script executable (first time only)
+chmod +x start-backend-only.sh
+
+# Start all backend services
 ./start-backend-only.sh
 ```
 
@@ -270,20 +339,19 @@ Wait until you see:
 ```
 
 This starts:
-- ✅ **Kafka** + **ZooKeeper** (message streaming)
-- ✅ **MongoDB** (database)
-- ✅ **Backend API** (Flask + WebSocket on port 5001)
-- ✅ **Producer** (generates transactions every 30s)
-
----
+- ✅ ZooKeeper (Kafka coordination)
+- ✅ Kafka (message broker on port 9092)
+- ✅ MongoDB (database on port 27017)
+- ✅ Backend API (Flask + WebSocket on port 5001)
+- ✅ Producer (generates 4 transactions/minute)
 
 ### Step 3: Start Frontend
 
-Open Terminal 3:
+**Terminal 3:**
 ```bash
 cd frontend
 
-# First time only: Install dependencies
+# Install dependencies (first time only)
 npm install
 
 # Start React development server
@@ -292,16 +360,15 @@ npm start
 
 Browser automatically opens at: **http://localhost:3000**
 
----
-
 ### 🎉 You're Live!
 
 You should see:
-- 📊 **Real-time counters** updating every 30 seconds
-- 📋 **Transaction table** with AI classifications
-- ✅ **Green rows** for legitimate transactions
-- 🚨 **Red rows** for fraudulent transactions
-- 🎯 **Confidence scores** and AI reasoning
+- 📊 **Statistics Cards**: Total, Legitimate, Fraudulent (click to filter)
+- 📋 **Transaction Table**: Real-time stream with AI classifications
+- ✅ **Green rows**: Legitimate transactions
+- ⚠️ **Red rows**: Fraudulent transactions
+- 🎯 **Confidence scores**: 0-100% AI confidence
+- 💡 **Reasoning**: Why AI classified each transaction
 
 ---
 
@@ -310,39 +377,39 @@ You should see:
 ```
 fraud-detection-system/
 │
-├── backend/                          # Python Flask backend
+├── backend/                          # Python backend (PySpark + Flask)
 │   ├── app.py                       # Flask app with REST API + WebSocket
-│   ├── consumer.py                  # Kafka consumer with retry logic
+│   ├── consumer.py                  # PySpark Structured Streaming consumer
 │   ├── llm_chain.py                 # LangChain + Llama3 integration
-│   ├── db.py                        # MongoDB client with indexes
-│   ├── config.py                    # Centralized configuration
+│   ├── db.py                        # MongoDB client with dynamic stats
+│   ├── config.py                    # Configuration (Kafka, Spark, MongoDB, Ollama)
 │   ├── schemas.py                   # Pydantic data models
 │   ├── requirements.txt             # Python dependencies
-│   ├── Dockerfile                   # Backend container image
+│   ├── Dockerfile                   # Container image (includes Java 21)
 │   └── .dockerignore                # Docker build optimization
 │
 ├── producer/                         # Transaction generator
-│   ├── producer.py                  # Kafka producer with Indian stocks
+│   ├── producer.py                  # Kafka producer (4 tx/min, ~25% fraud)
 │   └── Dockerfile                   # Producer container image
 │
-├── frontend/                         # React TypeScript frontend
+├── frontend/                         # React frontend (JavaScript)
 │   ├── public/
-│   │   └── index.html               # HTML template
+│   │   └── index.html               # HTML template with Bootstrap CDN
 │   ├── src/
-│   │   ├── App.tsx                  # Main React component
-│   │   ├── index.tsx                # React entry point
+│   │   ├── App.jsx                  # Main React component
+│   │   ├── index.jsx                # React entry point
 │   │   ├── index.css                # Global styles
 │   │   ├── components/
-│   │   │   ├── Counters.tsx         # Statistics cards
-│   │   │   └── RecentTable.tsx      # Transaction history table
+│   │   │   ├── Counters.jsx         # Statistics cards (clickable)
+│   │   │   └── RecentTable.jsx      # Transaction history table
 │   │   └── api/
-│   │       └── socket.ts            # WebSocket client
-│   ├── package.json                 # Node.js dependencies
-│   ├── tsconfig.json                # TypeScript configuration
-│   └── .dockerignore                # Docker build optimization
+│   │       └── socket.js            # WebSocket client (duplicate prevention)
+│   ├── package.json                 # Node.js dependencies (minimal)
+│   ├── nginx.conf                   # Nginx config for production
+│   └── Dockerfile                   # Frontend container image
 │
 ├── docker-compose-backend-only.yml  # Docker Compose configuration
-├── start-backend-only.sh            # Startup script
+├── start-backend-only.sh            # Startup script with health checks
 ├── .dockerignore                    # Root Docker ignore
 ├── .gitignore                       # Git ignore rules
 └── README.md                        # This file
@@ -354,149 +421,159 @@ fraud-detection-system/
 
 ### 1. Transaction Generation (Producer)
 
-The producer generates random transactions for 15 Indian NSE stocks:
+The producer generates realistic transactions with **intentional fraud patterns** (~25%):
 
-**Stock Symbols:**
-- RELIANCE, TCS, HDFCBANK, INFY, ICICIBANK
-- HINDUNILVR, BHARTIARTL, ITC, SBIN, LT
-- BAJFINANCE, ASIANPAINT, MARUTI, TITAN, WIPRO
-
-**Transaction Parameters:**
-- **Quantity**: 10 to 100,000 shares (wide range for fraud detection)
-- **Price**: 10% to 500% of normal range (creates legitimate and fraudulent patterns)
-- **Traders**: 50 different trader IDs (T0001 - T0050)
-- **Order Type**: Buy or Sell (randomly selected)
+**Fraud Pattern Distribution:**
+- **75%** - Normal/Legitimate: 100-75,000 shares, 0.6x-2.5x typical price
+- **10%** - Pump Scheme: 5,000-95,000 shares, 4.5x-8.0x typical price
+- **10%** - Wash Trading: 75,000-99,000 shares, 0.15x-0.35x typical price
+- **5%** - Market Manipulation: 85,000-99,000 shares, 4.0x-7.0x OR 0.15x-0.35x typical price
 
 **Example Transaction:**
 ```json
 {
-  "trade_id": "TX00000123",
-  "trader_id": "T0042",
+  "trade_id": "TX00000042",
+  "trader_id": "T0023",
   "symbol": "RELIANCE",
-  "quantity": 75000,
-  "price": 8500.50,
-  "timestamp": "2025-11-08T10:30:00",
+  "quantity": 85000,
+  "price": 6800.50,
+  "timestamp": "2025-11-08T18:30:15",
   "order_type": "buy"
 }
 ```
 
----
-
 ### 2. Kafka Streaming
 
-Transactions are sent to Kafka topic `transactions`:
-- **Key**: trade_id (for partitioning)
-- **Value**: JSON transaction object
+Transactions flow through Kafka topic `transactions`:
+- **Key**: trade_id (for partition distribution)
+- **Value**: JSON transaction
 - **Acknowledgment**: Waits for broker confirmation
+- **Interval**: Every 15 seconds (4 transactions/minute)
 
 **Why Kafka?**
-- **Scalability**: Handle millions of transactions
-- **Reliability**: Message persistence and replay
+- **Scalability**: Handle millions of messages
+- **Durability**: Persist messages for replay
 - **Decoupling**: Producer and consumer are independent
 
----
+### 3. PySpark Structured Streaming
 
-### 3. Consumer Processing
+PySpark processes transactions in **1-second micro-batches**:
 
-The Kafka consumer polls messages and processes them:
+**Processing Pipeline:**
 
-**Processing Steps:**
+1. **Spark Session Creation**
+   - Downloads Kafka connector JAR (`spark-sql-kafka-0-10_2.12:3.5.0`)
+   - Configures checkpoint directory for fault tolerance
 
-1. **Deduplication Check**
-   - Skip if trade_id already processed
+2. **Stream Reading**
+   - Reads from Kafka in streaming mode
+   - Parses JSON into structured DataFrame
 
-2. **Validation**
-   - Validate transaction using Pydantic schema
-   - Ensure all required fields are present
+3. **Micro-Batch Trigger**
+   - Triggers every 1 second
+   - Collects all new messages
 
-3. **Retry Loop** (up to 3 retries)
-   - Attempt 1: Immediate
-   - Attempt 2: Wait 2 seconds (2^1)
-   - Attempt 3: Wait 4 seconds (2^2)
-   - Attempt 4: Wait 8 seconds (2^3)
+4. **Batch Processing** (`foreachBatch`)
+   - Validates each transaction with Pydantic
+   - Checks for duplicates (skip if trade_id already processed)
+   - Retries up to 3 times with exponential backoff
 
-4. **LLM Classification**
-   - Send to Llama3 for analysis
-   - Measure latency
+5. **LLM Classification**
+   - Sends to Llama3 for fraud analysis
+   - Measures latency (~200-500ms)
 
-5. **Database Storage**
-   - Insert classification document
-   - Atomically update statistics
+6. **Database Storage**
+   - Upserts classification to MongoDB
+   - Calculates dynamic stats (counts actual documents)
 
-6. **WebSocket Broadcast**
-   - Emit transaction to frontend
-   - Emit updated statistics
+7. **WebSocket Broadcast**
+   - Emits transaction to frontend
+   - Emits updated statistics
 
-7. **Commit Offset**
-   - Mark message as processed
+8. **Checkpointing**
+   - Saves processing state to `./spark-checkpoint/`
+   - Enables recovery from failures
 
 **Failure Handling:**
-- After 3 failed retries, send to Dead Letter Queue (DLQ)
-- Log error details
-- Continue processing next message
-
----
+- After 3 retries, logs to DLQ (error logs)
+- Continues processing remaining messages in batch
 
 ### 4. LLM Classification
 
-Llama3 analyzes transactions using few-shot prompting:
+Llama3 analyzes transactions using **few-shot prompting**:
 
-**Fraud Indicators:**
-- Unusually large quantity (>50,000 shares) → Market manipulation
-- Very high prices (>300% of typical range) → Pump schemes
-- Very low prices (<50% of typical range) → Wash trading
-- Extreme quantities with unusual patterns
+**Prompt Structure:**
+```
+You are a fraud detection expert analyzing Indian stock transactions.
 
-**Legit Indicators:**
-- Normal trading quantities (10-10,000 shares)
-- Reasonable price ranges (50-150% of typical values)
-- Standard trading patterns
+TYPICAL PRICE RANGES (in ₹):
+RELIANCE: ₹2,400-2,800 | TCS: ₹3,500-4,000 | ...
 
-**Example Classification:**
-```json
-{
-  "label": "fraud",
-  "confidence": 0.95,
-  "reason": "Unusually large quantity of 75,000 shares suggests potential market manipulation"
-}
+FRAUD INDICATORS:
+1. Pump Scheme: Price >4x typical
+2. Wash Trading: Price <0.4x typical AND quantity >70,000
+3. Market Manipulation: Quantity >85,000 AND price >3.5x OR <0.4x
+
+EXAMPLES:
+✅ LEGIT: RELIANCE 75,000 @ ₹2,650 (within range)
+❌ FRAUD: INFY 20,000 @ ₹7,000 (4.6x typical = pump scheme)
+
+Transaction: RELIANCE 85,000 @ ₹6,800...
+
+Respond with JSON:
+{ "label": "fraud", "confidence": 0.95, "reason": "..." }
 ```
 
 **Response Processing:**
-- Parse JSON from LLM response
-- Enforce binary classification (fraud/legit only)
-- Clamp confidence to [0.0, 1.0]
-- Fallback to legit (0.5) on error
-
----
+- Parses JSON from LLM response
+- Enforces binary classification (fraud/legit only)
+- Clamps confidence to [0.0, 1.0]
+- Fallback to "legit" (0.5 confidence) on errors
 
 ### 5. Database Persistence
 
 MongoDB stores all classifications with metadata:
 
-**Collections:**
-
-1. **trade_classifications**
-   - All classified transactions
-   - Includes LLM result + latency metadata
-   - Indexed on: trade_id (unique), timestamp, label
-
-2. **stats**
-   - Global counters: { total, legit, fraud }
-   - Atomically updated on each classification
-
-**Atomic Update Example:**
+**Collection: `trade_classifications`**
 ```javascript
-db.stats.findOneAndUpdate(
-  { "_id": "stats" },
-  {
-    $inc: { "total": 1, "fraud": 1 },
-    $set: { "updated_at": new Date() }
+{
+  "_id": ObjectId("..."),
+  "trade_id": "TX00000042",
+  "trader_id": "T0023",
+  "symbol": "RELIANCE",
+  "quantity": 85000,
+  "price": 6800.50,
+  "timestamp": "2025-11-08T18:30:15",
+  "order_type": "buy",
+  "llama_result": {
+    "label": "fraud",
+    "confidence": 0.95,
+    "reason": "Large quantity (85,000) combined with price 2.4x typical range suggests market manipulation"
   },
-  { returnDocument: "after" }
-)
+  "processed_at": ISODate("2025-11-08T18:30:16.234Z"),
+  "consumer_metadata": {
+    "llm_latency_ms": 320.5,
+    "end_to_end_latency_ms": 1250.2,
+    "retry_count": 0
+  }
+}
 ```
 
----
+**Collection: `stats`**
+```javascript
+{
+  "_id": "stats",
+  "total": 1250,      // Dynamically calculated on each query
+  "legit": 950,       // count_documents({label: "legit"})
+  "fraud": 300,       // count_documents({label: "fraud"})
+  "updated_at": ISODate("2025-11-08T18:30:16Z")
+}
+```
+
+**Indexes:**
+- `trade_id` (unique) - Prevents duplicates
+- `processed_at` (descending) - Fast sorting
+- `llama_result.label, processed_at` (compound) - Fast filtered queries
 
 ### 6. Real-Time Visualization
 
@@ -504,34 +581,38 @@ Frontend receives updates via WebSocket:
 
 **WebSocket Events:**
 
-1. **summary_counts**
+1. **`summary_counts`** - Emitted on connect and after each classification
    ```json
-   { "total": 1250, "legit": 1100, "fraud": 150 }
+   { "total": 1250, "legit": 950, "fraud": 300 }
    ```
 
-2. **transaction_stream**
+2. **`transaction_stream`** - Emitted after each classification
    ```json
    {
-     "trade_id": "TX00000123",
+     "trade_id": "TX00000042",
      "symbol": "RELIANCE",
      "label": "fraud",
      "confidence": 0.95,
-     "reason": "...",
+     "reason": "Large quantity combined with high price...",
      ...
    }
    ```
 
 **UI Updates:**
-- **Counters**: Show percentages (Fraud: 12%, Legit: 88%)
-- **Table**: Prepend new transaction (keep last 200)
-- **Filters**: All / Legit / Fraud
+- **Counters**: Show percentages (Fraud: 24%, Legit: 76%)
+- **Table**: Prepends new transaction (keeps last 10,000)
+- **Filters**: Click cards or dropdown to filter
+- **Filter-aware**: Only adds transactions matching current filter
+- **Duplicate prevention**: Checks trade_id before adding
 - **Colors**: Red border for fraud, Green for legit
 
 ---
 
-## 📡 API Documentation
+## 📡 API Reference
 
-### REST API Endpoints
+### REST API
+
+**Base URL:** `http://localhost:5001`
 
 #### 1. Health Check
 
@@ -541,15 +622,8 @@ GET /health
 
 **Response:**
 ```json
-{
-  "status": "healthy"
-}
+{ "status": "healthy" }
 ```
-
-**Status Codes:**
-- `200 OK` - Service is healthy
-
----
 
 #### 2. Get Summary Statistics
 
@@ -561,16 +635,12 @@ GET /api/summary
 ```json
 {
   "total": 1250,
-  "legit": 1100,
-  "fraud": 150
+  "legit": 950,
+  "fraud": 300
 }
 ```
 
-**Status Codes:**
-- `200 OK` - Success
-- `500 Internal Server Error` - Database error
-
----
+**Note:** Stats are **dynamically calculated** from actual MongoDB data on each request.
 
 #### 3. Get Transactions (Paginated)
 
@@ -582,100 +652,34 @@ GET /api/transactions?limit=100&skip=0&label=fraud
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `limit` | integer | 100 | Number of transactions to return |
+| `limit` | integer | 100 | Max transactions to return (max 10,000) |
 | `skip` | integer | 0 | Offset for pagination |
 | `label` | string | null | Filter by "fraud" or "legit" |
 
 **Response:**
 ```json
 {
-  "transactions": [
-    {
-      "_id": "67...",
-      "trade_id": "TX00000123",
-      "trader_id": "T0042",
-      "symbol": "RELIANCE",
-      "quantity": 75000,
-      "price": 8500.50,
-      "timestamp": "2025-11-08T10:30:00",
-      "order_type": "buy",
-      "llama_result": {
-        "label": "fraud",
-        "confidence": 0.95,
-        "reason": "Unusually large quantity suggests market manipulation"
-      },
-      "processed_at": "2025-11-08T10:30:01.234Z",
-      "consumer_metadata": {
-        "llm_latency_ms": 320.5,
-        "end_to_end_latency_ms": 280.2,
-        "retry_count": 0
-      }
-    }
-  ],
-  "count": 1,
+  "transactions": [...],
+  "count": 100,
   "limit": 100,
   "skip": 0,
   "label": "fraud"
 }
 ```
 
-**Status Codes:**
-- `200 OK` - Success
-- `400 Bad Request` - Invalid label parameter
-- `500 Internal Server Error` - Database error
-
----
-
-### WebSocket Events
+### WebSocket API
 
 **Connection URL:** `http://localhost:5001`
 
 #### Client → Server Events
 
-**1. connect**
-- Triggered automatically on connection
-- Server responds with initial `summary_counts`
-
-**2. disconnect**
-- Triggered on disconnection
-
----
+- **`connect`** - Automatic on connection (server responds with initial `summary_counts`)
+- **`disconnect`** - Automatic on disconnection
 
 #### Server → Client Events
 
-**1. summary_counts**
-
-Emitted: On connect, after each classification
-
-```json
-{
-  "total": 1250,
-  "legit": 1100,
-  "fraud": 150
-}
-```
-
----
-
-**2. transaction_stream**
-
-Emitted: After each classification
-
-```json
-{
-  "trade_id": "TX00000123",
-  "trader_id": "T0042",
-  "symbol": "RELIANCE",
-  "quantity": 75000,
-  "price": 8500.50,
-  "timestamp": "2025-11-08T10:30:00",
-  "order_type": "buy",
-  "label": "fraud",
-  "confidence": 0.95,
-  "reason": "Unusually large quantity suggests market manipulation",
-  "processed_at": "2025-11-08T10:30:01.234Z"
-}
-```
+- **`summary_counts`** - Emitted on connect and after each classification
+- **`transaction_stream`** - Emitted after each classification
 
 ---
 
@@ -683,139 +687,63 @@ Emitted: After each classification
 
 ### Environment Variables
 
-All configuration is in `docker-compose-backend-only.yml` or `.env` file:
+All configuration is in `docker-compose-backend-only.yml`:
 
 **Kafka Configuration:**
 ```bash
-KAFKA_BOOTSTRAP_SERVERS=kafka:29092    # Kafka broker address
-KAFKA_TOPIC=transactions               # Main topic
-KAFKA_DLQ_TOPIC=transactions_dlq       # Dead Letter Queue
-KAFKA_GROUP_ID=fraud-detector-group    # Consumer group ID
+KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+KAFKA_TOPIC=transactions
+KAFKA_DLQ_TOPIC=transactions_dlq
+KAFKA_GROUP_ID=fraud-detector-group
+```
+
+**PySpark Configuration:**
+```bash
+SPARK_APP_NAME=FraudDetectionStreaming
+SPARK_MASTER=local[*]                    # Use all CPU cores
+SPARK_CHECKPOINT_DIR=./spark-checkpoint  # Fault tolerance
+SPARK_KAFKA_OFFSET=earliest              # Read from start
+SPARK_TRIGGER_INTERVAL=1 second          # Micro-batch interval
 ```
 
 **MongoDB Configuration:**
 ```bash
-MONGO_URI=mongodb://mongodb:27017      # MongoDB connection string
-MONGO_DB=fraud_detection               # Database name
+MONGO_URI=mongodb://mongodb:27017
+MONGO_DB=fraud_detection
 ```
 
 **Ollama Configuration:**
 ```bash
-OLLAMA_BASE_URL=http://host.docker.internal:11434  # Ollama API URL
-OLLAMA_MODEL=llama3:8b                             # LLM model name
+OLLAMA_BASE_URL=http://host.docker.internal:11434  # Host machine
+OLLAMA_MODEL=llama3:8b
 ```
 
 **Flask Configuration:**
 ```bash
-FLASK_HOST=0.0.0.0              # Bind to all interfaces
-FLASK_PORT=5000                 # Internal port (mapped to 5001 externally)
-FLASK_DEBUG=False               # Debug mode (set to True for development)
-CORS_ALLOWED_ORIGINS=*          # CORS allowed origins
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000                  # Internal (mapped to 5001 externally)
+FLASK_DEBUG=False
+CORS_ALLOWED_ORIGINS=*
 ```
 
 **Retry Configuration:**
 ```bash
-MAX_RETRIES=3                   # Maximum retry attempts
-RETRY_BACKOFF_BASE=2.0          # Exponential backoff base (2^n seconds)
-```
-
-**Frontend Configuration:**
-
-Edit `frontend/src/api/socket.ts`:
-```typescript
-const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
+MAX_RETRIES=3                    # Max retry attempts
+RETRY_BACKOFF_BASE=2.0           # Exponential backoff (2^n seconds)
 ```
 
 ### Port Mapping
 
 | Service | Container Port | Host Port | Access |
 |---------|----------------|-----------|--------|
-| **ZooKeeper** | 2181 | 2181 | Kafka coordination |
-| **Kafka** | 29092, 9092 | 9092 | Message broker |
-| **MongoDB** | 27017 | 27017 | Database |
-| **Backend** | 5000 | **5001** | API + WebSocket |
-| **Frontend** | 3000 | 3000 | React dev server |
-| **Ollama** | 11434 | 11434 | LLM API (host machine) |
+| ZooKeeper | 2181 | 2181 | Kafka coordination |
+| Kafka | 29092 | 9092 | Message broker |
+| MongoDB | 27017 | 27017 | Database |
+| Backend | 5000 | **5001** | API + WebSocket |
+| Frontend | 3000 | 3000 | React dev server |
+| Ollama | 11434 | 11434 | LLM API (host) |
 
-**Note:** Backend runs on port **5001** (not 5000) to avoid conflict with macOS AirPlay Receiver.
-
----
-
-## 🗄️ Database Schema
-
-### Collection: `trade_classifications`
-
-**Purpose:** Store all classified transactions with metadata
-
-**Document Structure:**
-```javascript
-{
-  "_id": ObjectId("..."),
-  "trade_id": "TX00000123",              // Unique identifier
-  "trader_id": "T0042",
-  "symbol": "RELIANCE",
-  "quantity": 75000,
-  "price": 8500.50,
-  "timestamp": "2025-11-08T10:30:00",
-  "order_type": "buy",
-  "llama_result": {
-    "label": "fraud",                    // "fraud" or "legit"
-    "confidence": 0.95,                  // 0.0 to 1.0
-    "reason": "Unusually large quantity suggests market manipulation"
-  },
-  "processed_at": "2025-11-08T10:30:01.234Z",
-  "consumer_metadata": {
-    "llm_latency_ms": 320.5,             // Time for LLM classification
-    "end_to_end_latency_ms": 280.2,      // Total processing time
-    "retry_count": 0                     // Number of retries (0-3)
-  },
-  "raw_message": { ... }                 // Optional: Original Kafka message
-}
-```
-
-**Indexes:**
-```javascript
-// 1. Unique index on trade_id (prevents duplicates)
-{ "trade_id": 1 } unique
-
-// 2. Timestamp index (for recent queries)
-{ "timestamp": -1 }
-
-// 3. Compound index (for filtered queries)
-{ "llama_result.label": 1, "timestamp": -1 }
-```
-
----
-
-### Collection: `stats`
-
-**Purpose:** Store global fraud detection statistics
-
-**Document Structure:**
-```javascript
-{
-  "_id": "stats",                        // Fixed ID (single document)
-  "total": 1250,                         // Total transactions
-  "legit": 1100,                         // Legitimate count
-  "fraud": 150,                          // Fraud count
-  "updated_at": ISODate("2025-11-08T10:30:01Z")
-}
-```
-
-**Atomic Updates:**
-
-All stats updates use `findOneAndUpdate` with `$inc` to ensure atomicity:
-
-```javascript
-db.stats.findOneAndUpdate(
-  { "_id": "stats" },
-  {
-    $inc: { "total": 1, "fraud": 1 },
-    $set: { "updated_at": new Date() }
-  },
-  { returnDocument: "after" }
-)
-```
+**Note:** Backend uses port **5001** to avoid conflict with macOS AirPlay Receiver (port 5000).
 
 ---
 
@@ -833,14 +761,16 @@ docker compose -f docker-compose-backend-only.yml up -d zookeeper kafka
 docker compose -f docker-compose-backend-only.yml up -d mongodb
 ```
 
-**Start Backend:**
+**Start Backend (Local Development):**
 ```bash
 cd backend
-source venv/bin/activate  # Or create: python3 -m venv venv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 python app.py
 ```
 
-**Start Producer:**
+**Start Producer (Local Development):**
 ```bash
 cd producer
 source ../backend/venv/bin/activate
@@ -853,8 +783,6 @@ cd frontend
 npm start
 ```
 
----
-
 ### Viewing Logs
 
 **All services:**
@@ -866,7 +794,6 @@ docker compose -f docker-compose-backend-only.yml logs -f
 ```bash
 docker compose -f docker-compose-backend-only.yml logs -f backend
 docker compose -f docker-compose-backend-only.yml logs -f producer
-docker compose -f docker-compose-backend-only.yml logs -f kafka
 ```
 
 **Last 50 lines:**
@@ -874,26 +801,28 @@ docker compose -f docker-compose-backend-only.yml logs -f kafka
 docker compose -f docker-compose-backend-only.yml logs --tail=50 backend
 ```
 
----
-
-### Rebuilding After Code Changes
-
-**Backend:**
+**Grep for specific events:**
 ```bash
-docker compose -f docker-compose-backend-only.yml up -d --build backend
+# View Spark batches
+docker compose -f docker-compose-backend-only.yml logs backend | grep "Processing batch"
+
+# View successful classifications
+docker compose -f docker-compose-backend-only.yml logs backend | grep "Successfully processed"
 ```
 
-**Producer:**
-```bash
-docker compose -f docker-compose-backend-only.yml up -d --build producer
+### Monitoring PySpark
+
+**Spark Web UI:**
+```
+http://localhost:4040
 ```
 
-**All services:**
-```bash
-docker compose -f docker-compose-backend-only.yml up -d --build
-```
-
----
+**What you can see:**
+- Active streaming queries
+- Batch processing times
+- Input/output rates
+- Memory usage
+- Checkpoint status
 
 ### Accessing MongoDB
 
@@ -907,10 +836,10 @@ docker exec -it fraud-detection-mongodb mongosh
 // Switch to database
 use fraud_detection
 
-// View recent classifications
-db.trade_classifications.find().sort({ timestamp: -1 }).limit(10)
+// View recent transactions
+db.trade_classifications.find().sort({ processed_at: -1 }).limit(10)
 
-// View statistics
+// View stats
 db.stats.findOne({ _id: "stats" })
 
 // Count by label
@@ -923,13 +852,13 @@ db.trade_classifications.aggregate([
   }
 ])
 
-// Find fraud transactions
-db.trade_classifications.find(
-  { "llama_result.label": "fraud" }
-).sort({ timestamp: -1 }).limit(20)
+// Delete all transactions (reset)
+db.trade_classifications.deleteMany({})
+db.stats.updateOne(
+  { _id: "stats" },
+  { $set: { total: 0, legit: 0, fraud: 0 } }
+)
 ```
-
----
 
 ### Testing Endpoints
 
@@ -948,6 +877,65 @@ curl http://localhost:5001/api/summary | jq
 curl "http://localhost:5001/api/transactions?limit=5&label=fraud" | jq
 ```
 
+### Rebuilding After Code Changes
+
+**Backend:**
+```bash
+docker compose -f docker-compose-backend-only.yml up -d --build backend
+```
+
+**Producer:**
+```bash
+docker compose -f docker-compose-backend-only.yml up -d --build producer
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm start  # Auto-reloads on changes
+```
+
+---
+
+## 📈 Performance
+
+### Latency Measurements
+
+| Metric | Average | Description |
+|--------|---------|-------------|
+| **Transaction Generation** | 15s | Producer interval (4 tx/min) |
+| **Kafka Delivery** | <50ms | Producer to broker |
+| **PySpark Micro-batch** | 1s | Batch trigger interval |
+| **LLM Classification** | 200-500ms | Llama3 inference (per tx) |
+| **MongoDB Write** | <10ms | Insert + stats update |
+| **WebSocket Broadcast** | <5ms | Backend to frontend |
+| **End-to-End** | ~1-2s | Kafka to dashboard |
+
+### Throughput
+
+- **Current**: 4 transactions/minute (15s interval)
+- **Configurable**: Change in `producer/producer.py:188`
+  ```python
+  producer.start(interval=10.0)  # 10s = 6 tx/min
+  ```
+
+### Resource Usage
+
+**Docker Containers:**
+- Kafka: ~512MB RAM
+- MongoDB: ~256MB RAM
+- Backend (PySpark + Flask): ~400-600MB RAM
+  - Java 21 JVM for PySpark
+  - Spark executor memory
+  - Python Flask process
+- Producer: ~64MB RAM
+
+**Ollama (Host):**
+- Llama3:8b: ~4.7GB disk, ~2GB RAM during inference
+
+**Frontend (Development):**
+- React Dev Server: ~200MB RAM
+
 ---
 
 ## 🐛 Troubleshooting
@@ -955,87 +943,80 @@ curl "http://localhost:5001/api/transactions?limit=5&label=fraud" | jq
 ### Backend Issues
 
 **Problem:** Backend can't connect to Ollama
+
 ```bash
-# Check if Ollama is running
+# Check Ollama is running
 curl http://localhost:11434
 
-# If not, start it
+# Start Ollama
 ollama serve
 
-# Verify model is available
+# Verify model
 ollama list | grep llama3
 ```
 
-**Solution:** Make sure Ollama is running and `llama3:8b` model is pulled.
+**Problem:** PySpark can't start - Java gateway errors
 
----
+```bash
+# Check Java is installed in container
+docker compose -f docker-compose-backend-only.yml exec backend java -version
+# Should show: openjdk version "21"
+
+# Rebuild if missing
+docker compose -f docker-compose-backend-only.yml up -d --build backend
+```
 
 **Problem:** Kafka connection errors
-```bash
-# Check Kafka is running
-docker compose -f docker-compose-backend-only.yml ps kafka
 
+```bash
 # Restart Kafka services
 docker compose -f docker-compose-backend-only.yml restart zookeeper kafka
 
 # Wait 30 seconds, then restart backend
+sleep 30
 docker compose -f docker-compose-backend-only.yml restart backend
 ```
 
----
+**Problem:** Spark checkpoint errors
 
-**Problem:** MongoDB connection errors
 ```bash
-# Check MongoDB is running
-docker compose -f docker-compose-backend-only.yml ps mongodb
+# Remove corrupted checkpoint
+docker compose -f docker-compose-backend-only.yml exec backend rm -rf ./spark-checkpoint
 
-# View MongoDB logs
-docker compose -f docker-compose-backend-only.yml logs mongodb
-
-# Restart MongoDB
-docker compose -f docker-compose-backend-only.yml restart mongodb
+# Restart backend
+docker compose -f docker-compose-backend-only.yml restart backend
 ```
-
----
 
 ### Producer Issues
 
 **Problem:** Producer not generating transactions
+
 ```bash
-# Check producer logs
+# Check logs
 docker compose -f docker-compose-backend-only.yml logs producer
 
-# Restart producer
+# Restart
 docker compose -f docker-compose-backend-only.yml restart producer
 ```
-
----
 
 ### Frontend Issues
 
 **Problem:** Frontend can't connect to backend
+
 ```bash
 # Check backend is running
 curl http://localhost:5001/health
 
-# Check browser console (F12) for WebSocket errors
-
-# Verify socket URL in frontend/src/api/socket.ts
+# Check WebSocket URL in frontend/src/api/socket.js
 # Should be: http://localhost:5001
 ```
 
----
+**Problem:** Old data after refresh
 
-**Problem:** Frontend shows old data
 ```bash
-# Clear browser cache and hard reload
-# Chrome/Firefox: Ctrl+Shift+R (Windows) or Cmd+Shift+R (Mac)
-
-# Or fetch latest data
-# Click on the Total counter to refresh
+# Click "Total Transactions" card to reload
+# Or hard refresh browser: Cmd+Shift+R (Mac) or Ctrl+Shift+R (Windows)
 ```
-
----
 
 ### Port Conflicts
 
@@ -1046,19 +1027,14 @@ curl http://localhost:5001/health
 lsof -i :5001   # Backend
 lsof -i :3000   # Frontend
 lsof -i :9092   # Kafka
-lsof -i :27017  # MongoDB
 
-# Kill the process (replace <PID> with actual number)
+# Kill the process
 kill -9 <PID>
-
-# Or change port in docker-compose-backend-only.yml
 ```
 
-**macOS AirPlay Receiver uses port 5000:**
+**macOS AirPlay Receiver (port 5000):**
 - System Settings → General → AirDrop & Handoff → Turn off "AirPlay Receiver"
 - Or keep using port 5001 (already configured)
-
----
 
 ### Reset Everything
 
@@ -1070,80 +1046,80 @@ docker compose -f docker-compose-backend-only.yml down -v
 **Fresh start:**
 ```bash
 ./start-backend-only.sh
+cd frontend && npm start  # In separate terminal
 ```
 
 ---
 
-## 📈 Performance
+## 🚀 Why PySpark?
 
-### Latency Measurements
+This system uses **PySpark Structured Streaming** for several key advantages:
 
-| Metric | Average | Description |
-|--------|---------|-------------|
-| **Transaction Generation** | 30s | Producer interval (configurable) |
-| **Kafka Delivery** | <50ms | Producer to broker |
-| **LLM Classification** | 200-500ms | Llama3 inference time |
-| **MongoDB Write** | <10ms | Insert + update stats |
-| **WebSocket Broadcast** | <5ms | Backend to frontend |
-| **End-to-End** | ~280ms | Kafka to dashboard |
+### Scalability
+- **Local to Distributed**: Run on laptop or multi-node cluster without code changes
+- **Horizontal Scaling**: Add more Spark workers to handle increased load
+- **Resource Management**: Efficient memory and CPU allocation
 
-### Throughput
+### Fault Tolerance
+- **Automatic Checkpointing**: State saved periodically for crash recovery
+- **Exactly-Once Semantics**: No duplicates or data loss
+- **Task Retry**: Failed tasks automatically retried
 
-- **Current**: 2 transactions/minute (30s interval)
-- **Configurable**: Change `interval` in `producer.py` line 173
-  ```python
-  producer.start(interval=10.0)  # 10 seconds = 6 tx/min
-  ```
+### Performance
+- **Micro-batch Processing**: Optimized for high-throughput streaming
+- **Catalyst Optimizer**: SQL query optimization
+- **Memory Management**: Efficient in-memory processing with spill to disk
 
-### Resource Usage
+### Production Ready
+- **Battle-Tested**: Used by Netflix, Uber, Airbnb for large-scale streaming
+- **Active Development**: Continuous improvements from Apache Spark community
+- **Monitoring**: Built-in Spark UI for debugging and performance tuning
 
-**Docker Containers:**
-- Kafka: ~512MB RAM
-- MongoDB: ~256MB RAM
-- Backend: ~128MB RAM
-- Producer: ~64MB RAM
-
-**Ollama (Host):**
-- Llama3:8b: ~4.7GB disk, ~2GB RAM during inference
-
----
-
-## 📄 License
-
-MIT License
+**Trade-off:** Slightly higher resource usage (~400MB vs ~128MB for simple Kafka consumer), but gains massive scalability and fault tolerance benefits.
 
 ---
 
 ## 👨‍💻 Author
 
-Built for educational purposes to demonstrate:
-- Real-time fraud detection
-- Event-driven architecture
-- AI integration with LLMs
-- Modern full-stack development
+**Aditya Maksare**
+
+Built to demonstrate:
+- Real-time fraud detection with AI
+- Event-driven architecture with Kafka
+- PySpark Structured Streaming for scalable data processing
+- AI integration with LLMs (Llama3)
+- Modern full-stack development (React + Flask)
+- Microservices with Docker
 
 ---
 
 ## 🙏 Acknowledgments
 
+- **Apache Spark** - Distributed stream processing engine
 - **Meta AI** - Llama3 model
 - **Ollama** - Local LLM inference
 - **Confluent** - Kafka platform
-- **MongoDB** - Database
+- **MongoDB** - NoSQL database
 - **LangChain** - LLM framework
+
+---
+
+## 📄 License
+
+MIT License - Free to use for educational and commercial purposes
 
 ---
 
 ## 📞 Support
 
-For issues or questions:
-1. Check the [Troubleshooting](#troubleshooting) section
-2. Review service logs: `docker compose -f docker-compose-backend-only.yml logs -f`
-3. Verify all prerequisites are met
+For issues:
+1. Check [Troubleshooting](#-troubleshooting) section
+2. View logs: `docker compose -f docker-compose-backend-only.yml logs -f`
+3. Verify prerequisites are met
 4. Ensure all ports are available
 
 ---
 
 **🎉 Happy Fraud Detecting!**
 
-Open **http://localhost:3000** and watch AI-powered fraud detection in action!
+Open **http://localhost:3000** and watch AI-powered fraud detection in action! 🚀

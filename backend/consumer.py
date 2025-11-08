@@ -1,15 +1,16 @@
 import json
 import logging
 import time
-from datetime import datetime
-from kafka import KafkaConsumer, KafkaProducer
-from kafka.errors import KafkaError
+from datetime import datetime, timezone
 from typing import Optional
+from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql.functions import col, from_json, udf
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType, FloatType
 
 from config import config
 from db import mongodb
 from llm_chain import classifier
-from schemas import Transaction, ClassificationDocument
+from schemas import Transaction, ClassificationDocument, LlamaResult
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,93 +18,139 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class FraudDetectionConsumer:
+class SparkFraudDetectionConsumer:
     def __init__(self, socketio=None):
-        self.consumer: Optional[KafkaConsumer] = None
-        self.dlq_producer: Optional[KafkaProducer] = None
+        self.spark: Optional[SparkSession] = None
         self.socketio = socketio
         self.running = False
         self.processed_trade_ids = set()  # For deduplication
-        
-    def connect(self):
-        """Initialize Kafka consumer and DLQ producer"""
+
+    def create_spark_session(self):
+        """Initialize Spark session with Kafka support"""
         try:
-            self.consumer = KafkaConsumer(
-                config.KAFKA_TOPIC,
-                bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
-                group_id=config.KAFKA_GROUP_ID,
-                value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-                key_deserializer=lambda k: k.decode('utf-8') if k else None,
-                enable_auto_commit=False,  # Manual commit after success
-                auto_offset_reset='earliest'
-            )
-            
-            self.dlq_producer = KafkaProducer(
-                bootstrap_servers=config.KAFKA_BOOTSTRAP_SERVERS,
-                value_serializer=lambda v: json.dumps(v).encode('utf-8')
-            )
-            
-            logger.info(f"Connected to Kafka topic: {config.KAFKA_TOPIC}")
+            self.spark = SparkSession.builder \
+                .appName(config.SPARK_APP_NAME) \
+                .master(config.SPARK_MASTER) \
+                .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0") \
+                .config("spark.sql.streaming.checkpointLocation", config.SPARK_CHECKPOINT_DIR) \
+                .getOrCreate()
+
+            # Set log level to reduce verbosity
+            self.spark.sparkContext.setLogLevel("WARN")
+
+            logger.info(f"Spark session created: {config.SPARK_APP_NAME}")
         except Exception as e:
-            logger.error(f"Failed to connect to Kafka: {e}")
+            logger.error(f"Failed to create Spark session: {e}")
             raise
-    
+
     def start(self):
-        """Start consuming messages"""
+        """Start consuming messages from Kafka using Spark Structured Streaming"""
         self.running = True
-        logger.info("Starting fraud detection consumer...")
-        
+        logger.info("Starting Spark fraud detection consumer...")
+
         try:
-            for message in self.consumer:
-                if not self.running:
-                    break
-                    
-                self.process_message(message)
-                
+            # Define schema for transaction JSON
+            transaction_schema = StructType([
+                StructField("trade_id", StringType(), False),
+                StructField("trader_id", StringType(), False),
+                StructField("symbol", StringType(), False),
+                StructField("quantity", IntegerType(), False),
+                StructField("price", FloatType(), False),
+                StructField("timestamp", StringType(), False),
+                StructField("order_type", StringType(), False)
+            ])
+
+            # Read from Kafka
+            df = self.spark \
+                .readStream \
+                .format("kafka") \
+                .option("kafka.bootstrap.servers", config.KAFKA_BOOTSTRAP_SERVERS) \
+                .option("subscribe", config.KAFKA_TOPIC) \
+                .option("startingOffsets", config.SPARK_KAFKA_OFFSET) \
+                .option("failOnDataLoss", "false") \
+                .load()
+
+            # Parse the value column (JSON string) into structured data
+            parsed_df = df.select(
+                col("key").cast("string").alias("trade_id_key"),
+                from_json(col("value").cast("string"), transaction_schema).alias("data")
+            ).select("trade_id_key", "data.*")
+
+            # Process each micro-batch
+            query = parsed_df \
+                .writeStream \
+                .foreachBatch(self.process_batch) \
+                .trigger(processingTime=config.SPARK_TRIGGER_INTERVAL) \
+                .start()
+
+            logger.info("Spark streaming query started")
+
+            # Wait for termination
+            query.awaitTermination()
+
         except KeyboardInterrupt:
             logger.info("Consumer interrupted by user")
         except Exception as e:
             logger.error(f"Consumer error: {e}")
+            raise
         finally:
             self.stop()
-    
-    def stop(self):
-        """Stop consumer gracefully"""
-        self.running = False
-        if self.consumer:
-            self.consumer.close()
-        if self.dlq_producer:
-            self.dlq_producer.close()
-        logger.info("Consumer stopped")
-    
-    def process_message(self, message):
-        """Process a single Kafka message with retry logic"""
-        trade_id = message.key
-        
-        # Deduplicate
-        if trade_id in self.processed_trade_ids:
-            logger.info(f"Skipping duplicate trade_id: {trade_id}")
-            self.consumer.commit()
-            return
-        
-        transaction_data = message.value
-        start_time = time.time()
-        
+
+    def process_batch(self, batch_df: DataFrame, batch_id: int):
+        """Process each micro-batch of transactions"""
+        logger.info(f"Processing batch {batch_id} with {batch_df.count()} records")
+
+        # Convert to list of rows for processing
+        transactions = batch_df.collect()
+
+        for row in transactions:
+            try:
+                trade_id = row.trade_id
+
+                # Deduplicate
+                if trade_id in self.processed_trade_ids:
+                    logger.info(f"Skipping duplicate trade_id: {trade_id}")
+                    continue
+
+                # Build transaction data
+                transaction_data = {
+                    "trade_id": row.trade_id,
+                    "trader_id": row.trader_id,
+                    "symbol": row.symbol,
+                    "quantity": row.quantity,
+                    "price": row.price,
+                    "timestamp": row.timestamp,
+                    "order_type": row.order_type
+                }
+
+                start_time = time.time()
+
+                # Process with retry logic
+                success = self.process_transaction(transaction_data, start_time)
+
+                if success:
+                    self.processed_trade_ids.add(trade_id)
+
+            except Exception as e:
+                logger.error(f"Error processing transaction in batch {batch_id}: {e}")
+
+    def process_transaction(self, transaction_data: dict, start_time: float) -> bool:
+        """Process a single transaction with retry logic"""
         retry_count = 0
         max_retries = config.MAX_RETRIES
-        
+
         while retry_count <= max_retries:
             try:
                 # Validate transaction
                 transaction = Transaction(**transaction_data)
-                
+
                 # Classify with LLM
                 llama_result, llm_latency = classifier.classify(transaction)
-                
-                # Create classification document
-                processed_at = datetime.utcnow()
+
+                # Create classification document with timezone-aware timestamp
+                processed_at = datetime.now(timezone.utc)
                 end_to_end_latency = (time.time() - start_time) * 1000
-                
+
                 doc = ClassificationDocument(
                     trade_id=transaction.trade_id,
                     trader_id=transaction.trader_id,
@@ -121,46 +168,40 @@ class FraudDetectionConsumer:
                     },
                     raw_message=transaction_data
                 )
-                
+
                 # Write to MongoDB
                 doc_dict = doc.model_dump(mode='json')
                 success = mongodb.insert_classification(doc_dict)
-                
+
                 if not success:
                     raise Exception("Failed to insert into MongoDB")
-                
+
                 # Update stats
                 stats = mongodb.update_stats(llama_result.label)
-                
-                # Mark as processed
-                self.processed_trade_ids.add(trade_id)
-                
+
                 # Emit via WebSocket
                 if self.socketio:
                     self._emit_updates(doc_dict, stats)
-                
-                # Commit offset
-                self.consumer.commit()
-                
-                logger.info(f"Successfully processed {trade_id} - {llama_result.label} ({llama_result.confidence:.2f})")
-                break
-                
+
+                logger.info(f"Successfully processed {transaction.trade_id} - {llama_result.label} ({llama_result.confidence:.2f})")
+                return True
+
             except Exception as e:
                 retry_count += 1
-                logger.error(f"Error processing {trade_id} (attempt {retry_count}/{max_retries}): {e}")
-                
+                logger.error(f"Error processing {transaction_data.get('trade_id')} (attempt {retry_count}/{max_retries}): {e}")
+
                 if retry_count > max_retries:
-                    # Send to DLQ
-                    self._send_to_dlq(transaction_data, str(e))
-                    # Commit to move past this message
-                    self.consumer.commit()
-                    break
+                    # Send to DLQ (you could implement Kafka write here if needed)
+                    self._log_dlq(transaction_data, str(e))
+                    return False
                 else:
                     # Exponential backoff
                     backoff = config.RETRY_BACKOFF_BASE ** retry_count
                     logger.info(f"Retrying in {backoff}s...")
                     time.sleep(backoff)
-    
+
+        return False
+
     def _emit_updates(self, doc: dict, stats: dict):
         """Emit updates via WebSocket"""
         try:
@@ -178,22 +219,29 @@ class FraudDetectionConsumer:
                 'reason': doc['llama_result']['reason'],
                 'processed_at': doc['processed_at'].isoformat() if isinstance(doc['processed_at'], datetime) else doc['processed_at']
             })
-            
+
             # Emit summary counts
             self.socketio.emit('summary_counts', stats)
-            
+
         except Exception as e:
             logger.error(f"Failed to emit WebSocket updates: {e}")
-    
-    def _send_to_dlq(self, message: dict, error: str):
-        """Send failed message to Dead Letter Queue"""
+
+    def _log_dlq(self, message: dict, error: str):
+        """Log failed message (DLQ replacement)"""
         try:
             dlq_message = {
                 "original_message": message,
                 "error": error,
                 "timestamp": datetime.utcnow().isoformat()
             }
-            self.dlq_producer.send(config.KAFKA_DLQ_TOPIC, value=dlq_message)
-            logger.info(f"Sent message to DLQ: {message.get('trade_id')}")
+            logger.error(f"DLQ: {json.dumps(dlq_message)}")
+            # You could also write this to a file or separate MongoDB collection
         except Exception as e:
-            logger.error(f"Failed to send to DLQ: {e}")
+            logger.error(f"Failed to log DLQ message: {e}")
+
+    def stop(self):
+        """Stop consumer gracefully"""
+        self.running = False
+        if self.spark:
+            self.spark.stop()
+        logger.info("Spark consumer stopped")

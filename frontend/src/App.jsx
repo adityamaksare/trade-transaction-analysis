@@ -1,51 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Counters from './components/Counters';
 import RecentTable from './components/RecentTable';
 import { connectSocket, disconnectSocket, onSummaryCounts, onTransactionStream } from './api/socket';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-interface Transaction {
-  trade_id: string;
-  trader_id: string;
-  symbol: string;
-  quantity: number;
-  price: number;
-  timestamp: string;
-  order_type: string;
-  label: string;
-  confidence: number;
-  reason: string;
-  processed_at: string;
-}
-
-interface Stats {
-  total: number;
-  legit: number;
-  fraud: number;
-}
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
 function App() {
-  const [stats, setStats] = useState<Stats>({ total: 0, legit: 0, fraud: 0 });
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [filter, setFilter] = useState<string>('all');
+  const [stats, setStats] = useState({ total: 0, legit: 0, fraud: 0 });
+  const [transactions, setTransactions] = useState([]);
+  const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(false);
+  const filterRef = useRef('all');
+
+  // Fetch initial stats from API
+  const fetchStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/summary`);
+      const data = await response.json();
+      setStats(data);
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
 
   useEffect(() => {
+    // Load initial data from database on mount
+    fetchStats();
+    fetchTransactions();
+
     // Connect to WebSocket
     connectSocket();
 
     // Listen for summary counts
-    onSummaryCounts((data: Stats) => {
+    onSummaryCounts((data) => {
       setStats(data);
     });
 
-    // Listen for transaction stream
-    onTransactionStream((data: Transaction) => {
+    // Listen for transaction stream (prepend to existing list)
+    onTransactionStream((data) => {
       setTransactions(prev => {
+        // Check for duplicates
+        const exists = prev.some(tx => tx.trade_id === data.trade_id);
+        if (exists) return prev;
+
+        // Only add if matches current filter
+        const currentFilter = filterRef.current;
+        if (currentFilter !== 'all' && data.label !== currentFilter) {
+          return prev; // Don't add if doesn't match filter
+        }
+
         const newTransactions = [data, ...prev];
-        // Keep only last 200 transactions
-        return newTransactions.slice(0, 200);
+        // Keep only last 10000 transactions in memory (match fetch limit)
+        return newTransactions.slice(0, 10000);
       });
     });
 
@@ -56,19 +62,19 @@ function App() {
   }, []);
 
   // Fetch transactions from API based on filter
-  const fetchTransactions = async (label?: string) => {
+  const fetchTransactions = async (label) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: '1000' });
+      const params = new URLSearchParams({ limit: '10000' }); // Fetch all transactions
       if (label && label !== 'all') {
         params.append('label', label);
       }
-      
+
       const response = await fetch(`${API_BASE_URL}/api/transactions?${params.toString()}`);
       const data = await response.json();
-      
+
       // Transform API response to match Transaction interface
-      const transformedTransactions = data.transactions.map((tx: any) => ({
+      const transformedTransactions = data.transactions.map((tx) => ({
         trade_id: tx.trade_id,
         trader_id: tx.trader_id,
         symbol: tx.symbol,
@@ -81,7 +87,12 @@ function App() {
         reason: tx.llama_result?.reason || 'No reason provided',
         processed_at: tx.processed_at
       }));
-      
+
+      // Sort by processed_at descending (newest first)
+      transformedTransactions.sort((a, b) => {
+        return new Date(b.processed_at).getTime() - new Date(a.processed_at).getTime();
+      });
+
       setTransactions(transformedTransactions);
     } catch (error) {
       console.error('Error fetching transactions:', error);
@@ -92,36 +103,34 @@ function App() {
 
   const handleTotalClick = () => {
     setFilter('all');
+    filterRef.current = 'all';
     fetchTransactions();
   };
 
   const handleLegitClick = () => {
     setFilter('legit');
+    filterRef.current = 'legit';
     fetchTransactions('legit');
   };
 
   const handleFraudClick = () => {
     setFilter('fraud');
+    filterRef.current = 'fraud';
     fetchTransactions('fraud');
   };
 
-  const filteredTransactions = transactions.filter(tx => {
-    if (filter === 'all') return true;
-    return tx.label === filter;
-  });
-
   return (
-    <div 
-      className="min-vh-100" 
-      style={{ 
+    <div
+      className="min-vh-100"
+      style={{
         background: 'linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)',
         minHeight: '100vh'
       }}
     >
       {/* Modern Header */}
-      <header 
-        style={{ 
-          background: 'rgba(255, 255, 255, 0.05)', 
+      <header
+        style={{
+          background: 'rgba(255, 255, 255, 0.05)',
           backdropFilter: 'blur(10px)',
           borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
           boxShadow: '0 4px 30px rgba(0, 0, 0, 0.3)'
@@ -141,7 +150,7 @@ function App() {
                 <span className="badge bg-success bg-opacity-25 text-white border border-success">
                   ● Live
                 </span>
-                <span className="text-white-50 small">{filteredTransactions.length} Transactions</span>
+                <span className="text-white-50 small">{transactions.length} Transactions</span>
               </div>
             </div>
           </div>
@@ -150,17 +159,17 @@ function App() {
 
       <main className="container py-4">
         {/* Statistics Cards */}
-        <Counters 
-          stats={stats} 
+        <Counters
+          stats={stats}
           onTotalClick={handleTotalClick}
           onLegitClick={handleLegitClick}
           onFraudClick={handleFraudClick}
         />
 
         {/* Filter Section */}
-        <div 
-          className="card mb-4 border-0" 
-          style={{ 
+        <div
+          className="card mb-4 border-0"
+          style={{
             background: 'rgba(255, 255, 255, 0.08)',
             backdropFilter: 'blur(10px)',
             boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
@@ -172,19 +181,18 @@ function App() {
                 <i className="bi bi-funnel text-white-50"></i>
                 <label className="text-white fw-semibold mb-0">Filter Transactions:</label>
               </div>
-              <select 
-                className="form-select form-select-md" 
-                style={{ 
-                  width: 'auto', 
+              <select
+                className="form-select form-select-md"
+                style={{
+                  width: 'auto',
                   minWidth: '200px',
                   background: 'rgba(255, 255, 255, 0.1)',
                   border: '1px solid rgba(255, 255, 255, 0.2)',
                   color: 'white'
                 }}
-                value={filter} 
+                value={filter}
                 onChange={(e) => {
                   const newFilter = e.target.value;
-                  setFilter(newFilter);
                   if (newFilter === 'all') {
                     handleTotalClick();
                   } else if (newFilter === 'legit') {
@@ -211,14 +219,14 @@ function App() {
             <p className="mt-3 text-white">Loading transactions...</p>
           </div>
         ) : (
-          <RecentTable transactions={filteredTransactions} />
+          <RecentTable transactions={transactions} />
         )}
       </main>
 
       {/* Modern Footer */}
-      <footer 
-        className="text-white text-center py-4 mt-5" 
-        style={{ 
+      <footer
+        className="text-white text-center py-4 mt-5"
+        style={{
           background: 'rgba(255, 255, 255, 0.03)',
           borderTop: '1px solid rgba(255, 255, 255, 0.1)'
         }}
@@ -228,7 +236,7 @@ function App() {
             Powered by <span className="text-white fw-semibold">Kafka • Ollama Llama3 • MongoDB • React</span>
           </p>
           <p className="mb-0 text-white-50" style={{ fontSize: '0.75rem' }}>
-            © 2025 Fraud Detection System | Real-Time AI-Powered Analytics
+            © 2025 Fraud Detection System | Real-Time AI-Powered Analytics | Aditya Maksare
           </p>
         </div>
       </footer>

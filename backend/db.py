@@ -26,8 +26,8 @@ class MongoDB:
             
             # Create indexes
             self.classifications.create_index([("trade_id", ASCENDING)], unique=True)
-            self.classifications.create_index([("timestamp", DESCENDING)])
-            self.classifications.create_index([("llama_result.label", ASCENDING), ("timestamp", DESCENDING)])
+            self.classifications.create_index([("processed_at", DESCENDING)])
+            self.classifications.create_index([("llama_result.label", ASCENDING), ("processed_at", DESCENDING)])
             
             # Initialize stats document if it doesn't exist
             self.stats.update_one(
@@ -101,16 +101,32 @@ class MongoDB:
             raise
     
     def get_stats(self) -> Dict[str, int]:
-        """Get current stats"""
+        """Get current stats calculated from actual data"""
         try:
-            result = self.stats.find_one({"_id": "stats"})
-            if result:
-                return {
-                    "total": result["total"],
-                    "legit": result["legit"],
-                    "fraud": result["fraud"]
-                }
-            return {"total": 0, "legit": 0, "fraud": 0}
+            # Calculate stats from actual data in database
+            total = self.classifications.count_documents({})
+            legit = self.classifications.count_documents({"llama_result.label": "legit"})
+            fraud = self.classifications.count_documents({"llama_result.label": "fraud"})
+
+            # Update the stats collection for reference
+            self.stats.update_one(
+                {"_id": "stats"},
+                {
+                    "$set": {
+                        "total": total,
+                        "legit": legit,
+                        "fraud": fraud,
+                        "updated_at": datetime.utcnow()
+                    }
+                },
+                upsert=True
+            )
+
+            return {
+                "total": total,
+                "legit": legit,
+                "fraud": fraud
+            }
         except Exception as e:
             logger.error(f"Failed to get stats: {e}")
             return {"total": 0, "legit": 0, "fraud": 0}
@@ -121,8 +137,8 @@ class MongoDB:
             query = {}
             if label:
                 query["llama_result.label"] = label
-                
-            cursor = self.classifications.find(query).sort("timestamp", DESCENDING).skip(skip).limit(limit)
+
+            cursor = self.classifications.find(query).sort("processed_at", DESCENDING).skip(skip).limit(limit)
             return list(cursor)
         except Exception as e:
             logger.error(f"Failed to get transactions: {e}")

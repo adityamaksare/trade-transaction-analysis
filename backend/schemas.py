@@ -40,5 +40,5 @@ class ClassificationDocument(BaseModel):
     
     class Config:
         json_encoders = {
-            datetime: lambda v: v.isoformat()
+            datetime: lambda v: v.isoformat() if v.tzinfo else v.isoformat() + 'Z'
         }

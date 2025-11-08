@@ -16,20 +16,28 @@ PROMPT_TEMPLATE = """You are a fraud detection expert analyzing stock market tra
 
 Classify the following transaction as either "fraud" or "legit". You MUST choose one of these two labels - no "unknown" or other labels are allowed.
 
-If the transaction seems ambiguous, choose the more likely classification based on the patterns below:
+TYPICAL PRICE RANGES (in ₹):
+RELIANCE: ₹2,400-2,800 | TCS: ₹3,500-4,000 | HDFCBANK: ₹1,500-1,700 | INFY: ₹1,400-1,600
+ICICIBANK: ₹900-1,100 | HINDUNILVR: ₹2,300-2,600 | BHARTIARTL: ₹800-1,000 | ITC: ₹400-450
+SBIN: ₹550-650 | LT: ₹3,200-3,600 | BAJFINANCE: ₹6,500-7,500 | ASIANPAINT: ₹2,800-3,200
+MARUTI: ₹10,000-12,000 | TITAN: ₹3,000-3,400 | WIPRO: ₹400-500
 
-FRAUD INDICATORS:
-- Unusually large quantity (>50000 shares) - likely market manipulation
-- Very high prices (>300% of typical range) - pump schemes
-- Very low prices (<50% of typical range) - wash trading
-- Extreme quantities (10000-100000 shares) with unusual patterns
-- Transactions that seem artificially inflated
+FRAUD INDICATORS (flag as fraud if ANY of these):
+1. **Pump Scheme**: Price >4x typical range (e.g., INFY at ₹6,400+, SBIN at ₹2,600+)
+2. **Wash Trading**: Price <0.4x typical AND quantity >70,000 (e.g., BHARTIARTL <₹320 with 75k+ shares)
+3. **Market Manipulation**: Quantity >85,000 AND price >3.5x OR <0.4x typical
 
-LEGIT INDICATORS:
-- Normal trading quantities (10-10000 shares)
-- Reasonable price ranges (within 50-150% of typical values)
-- Standard trading patterns
-- Transactions that appear natural and within market norms
+LEGIT INDICATORS (default assumption):
+- Normal institutional trades: 50,000-80,000 shares at 0.6x-2.5x typical price
+- Large volume alone is NOT fraud: 70,000 shares at normal price is legitimate
+- Price volatility alone is NOT fraud: 2.5x typical price with normal quantity is OK
+
+EXAMPLES:
+✅ LEGIT: RELIANCE 75,000 @ ₹2,650 (within normal range)
+✅ LEGIT: INFY 60,000 @ ₹2,400 (1.6x typical, but quantity OK)
+❌ FRAUD: INFY 20,000 @ ₹7,000 (4.6x typical = pump scheme)
+❌ FRAUD: BHARTIARTL 91,000 @ ₹290 (0.32x typical + high qty = wash trading)
+❌ FRAUD: SBIN 90,000 @ ₹2,800 (>85k qty + 4.7x typical = manipulation)
 
 Transaction details:
 Trade ID: {trade_id}

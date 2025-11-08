@@ -1,28 +1,10 @@
 import React from 'react';
 
-interface Transaction {
-  trade_id: string;
-  trader_id: string;
-  symbol: string;
-  quantity: number;
-  price: number;
-  timestamp: string;
-  order_type: string;
-  label: string;
-  confidence: number;
-  reason: string;
-  processed_at: string;
-}
-
-interface RecentTableProps {
-  transactions: Transaction[];
-}
-
-const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
+const RecentTable = ({ transactions }) => {
   return (
-    <div 
-      className="card border-0" 
-      style={{ 
+    <div
+      className="card border-0"
+      style={{
         background: '#ffffff',
         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
         borderRadius: '16px',
@@ -30,9 +12,9 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
         border: '2px solid #e0e0e0'
       }}
     >
-      <div 
+      <div
         className="card-header border-0"
-        style={{ 
+        style={{
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
           borderBottom: '2px solid #667eea',
           padding: '1.25rem'
@@ -57,7 +39,7 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
       <div className="card-body p-0">
         <div className="table-responsive" style={{ maxHeight: '600px', overflowY: 'auto' }}>
           <table className="table table-hover mb-0">
-            <thead style={{ 
+            <thead style={{
               background: '#f8f9fa',
               position: 'sticky',
               top: 0,
@@ -91,16 +73,16 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
                 </tr>
               ) : (
                 transactions.map((tx, index) => (
-                  <tr 
-                    key={tx.trade_id} 
+                  <tr
+                    key={tx.trade_id}
                     style={{
                       borderLeft: tx.label === 'fraud' ? '5px solid #ff4757' : '5px solid #2ed573',
                       background: index % 2 === 0 ? '#ffffff' : '#f8f9fa',
                       borderBottom: '1px solid #dee2e6'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = tx.label === 'fraud' 
-                        ? '#ffe6e6' 
+                      e.currentTarget.style.background = tx.label === 'fraud'
+                        ? '#ffe6e6'
                         : '#e6f9e6';
                     }}
                     onMouseLeave={(e) => {
@@ -127,8 +109,8 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
                       ₹{tx.price.toFixed(2)}
                     </td>
                     <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
-                      <span 
-                        className="badge" 
+                      <span
+                        className="badge"
                         style={{
                           background: tx.order_type === 'buy' ? '#2ed573' : '#ff4757',
                           color: 'white',
@@ -142,7 +124,7 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
                       </span>
                     </td>
                     <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
-                      <span 
+                      <span
                         className="badge"
                         style={{
                           background: tx.label === 'fraud' ? '#ff4757' : '#2ed573',
@@ -157,7 +139,7 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
                       </span>
                     </td>
                     <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
-                      <span style={{ 
+                      <span style={{
                         fontWeight: 700,
                         fontSize: '1rem',
                         color: tx.confidence > 0.8 ? '#2ed573' : tx.confidence > 0.5 ? '#ffa502' : '#ff4757'
@@ -169,7 +151,7 @@ const RecentTable: React.FC<RecentTableProps> = ({ transactions }) => {
                       {tx.reason}
                     </td>
                     <td className="text-muted small text-nowrap" style={{ padding: '1rem 0.75rem' }}>
-                      {new Date(tx.timestamp).toLocaleTimeString()}
+                      {new Date(tx.processed_at).toLocaleString()}
                     </td>
                   </tr>
                 ))

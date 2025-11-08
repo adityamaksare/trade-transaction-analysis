@@ -1,8 +1,8 @@
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
 
 const SOCKET_URL = process.env.REACT_APP_SOCKET_URL || 'http://localhost:5001';
 
-let socket: Socket | null = null;
+let socket = null;
 
 export const connectSocket = () => {
   if (socket?.connected) {
@@ -40,12 +40,16 @@ export const disconnectSocket = () => {
   }
 };
 
-export const onSummaryCounts = (callback: (data: any) => void) => {
+export const onSummaryCounts = (callback) => {
   if (!socket) return;
+  // Remove all previous listeners before adding new one
+  socket.off('summary_counts');
   socket.on('summary_counts', callback);
 };
 
-export const onTransactionStream = (callback: (data: any) => void) => {
+export const onTransactionStream = (callback) => {
   if (!socket) return;
+  // Remove all previous listeners before adding new one
+  socket.off('transaction_stream');
   socket.on('transaction_stream', callback);
 };

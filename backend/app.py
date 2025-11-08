@@ -6,7 +6,7 @@ from flask_cors import CORS
 
 from config import config
 from db import mongodb
-from consumer import FraudDetectionConsumer
+from consumer import SparkFraudDetectionConsumer
 
 logging.basicConfig(
     level=logging.INFO,
@@ -93,11 +93,11 @@ def handle_disconnect():
     logger.info('Client disconnected')
 
 def start_consumer():
-    """Start Kafka consumer in a separate thread"""
+    """Start Spark Structured Streaming consumer in a separate thread"""
     global consumer
     try:
-        consumer = FraudDetectionConsumer(socketio=socketio)
-        consumer.connect()
+        consumer = SparkFraudDetectionConsumer(socketio=socketio)
+        consumer.create_spark_session()
         consumer.start()
     except Exception as e:
         logger.error(f"Consumer thread error: {e}")

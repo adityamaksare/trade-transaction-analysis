@@ -77,33 +77,49 @@ class TransactionProducer:
             raise
     
     def generate_transaction(self) -> dict:
-        """Generate a completely random transaction - Llama3 will determine if it's fraud"""
+        """Generate random transaction with ~25% being fraudulent patterns"""
         self.transaction_counter += 1
         trade_id = f"TX{self.transaction_counter:08d}"
-        
+
         # Select random Indian stock
         symbol = random.choice(SYMBOLS)
         price_range = PRICE_RANGES[symbol]
-        
-        # Generate completely random transaction values across wide ranges
-        # Llama3 will analyze these patterns to detect fraud
-        
-        # Random quantity - wide range from small to large
-        quantity = random.randint(10, 100000)
-        
-        # Random price - can be anywhere from 10% to 500% of normal range
-        # This allows for both normal and suspicious prices
-        price_variation = random.uniform(0.1, 5.0)
-        base_price = random.uniform(price_range[0], price_range[1])
-        price = base_price * price_variation
-        
+
+        # Generate transaction with intentional fraud patterns in ~25% of cases
+        fraud_type = random.random()
+
+        if fraud_type < 0.75:  # 75% - Normal/Legitimate transactions
+            # Normal institutional trade ranges
+            quantity = random.randint(100, 75000)
+            price_variation = random.uniform(0.6, 2.5)  # 60% to 250% of normal
+            base_price = random.uniform(price_range[0], price_range[1])
+            price = base_price * price_variation
+
+        elif fraud_type < 0.85:  # 10% - Pump scheme (extreme high price)
+            quantity = random.randint(5000, 95000)
+            price_variation = random.uniform(4.5, 8.0)  # 450% to 800% of normal (extreme)
+            base_price = random.uniform(price_range[0], price_range[1])
+            price = base_price * price_variation
+
+        elif fraud_type < 0.95:  # 10% - Wash trading (very low price + high quantity)
+            quantity = random.randint(75000, 99000)  # Very high quantity
+            price_variation = random.uniform(0.15, 0.35)  # 15% to 35% of normal (very low)
+            base_price = random.uniform(price_range[0], price_range[1])
+            price = base_price * price_variation
+
+        else:  # 5% - Market manipulation (extreme quantity + extreme price)
+            quantity = random.randint(85000, 99000)  # Very high quantity
+            price_variation = random.uniform(4.0, 7.0)  # 400% to 700% of normal
+            base_price = random.uniform(price_range[0], price_range[1])
+            price = base_price * price_variation
+
         # Random trader from all available traders
         trader_id = random.choice(TRADER_IDS)
-        
+
         # Use current local time
         from datetime import datetime
         current_time = datetime.now()
-        
+
         transaction = {
             "trade_id": trade_id,
             "trader_id": trader_id,
@@ -113,7 +129,7 @@ class TransactionProducer:
             "timestamp": current_time.isoformat(),
             "order_type": random.choice(ORDER_TYPES)
         }
-        
+
         return transaction
     
     def send_transaction(self, transaction: dict):
@@ -166,10 +182,10 @@ class TransactionProducer:
 def main():
     """Main entry point"""
     producer = TransactionProducer()
-    
+
     try:
         producer.connect()
-        producer.start(interval=30.0)
+        producer.start(interval=15.0)  # 4 transactions per minute
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)
