@@ -8,9 +8,8 @@ from kafka.errors import KafkaError
 import sys
 import os
 
-# Add backend to path for config
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
-from config import config
+# Import config from backend module
+from backend.config import config
 
 logging.basicConfig(
     level=logging.INFO,

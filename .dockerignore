@@ -1,0 +1,40 @@
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+!DOCKER_README.md
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+
+# Node
+node_modules/
+build/
+
+# Logs
+*.log
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Scripts (already in image)
+*.sh
