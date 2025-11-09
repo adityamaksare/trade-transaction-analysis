@@ -10,7 +10,6 @@ function App() {
   const [transactions, setTransactions] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(false);
-  const filterRef = useRef('all');
 
   // Fetch initial stats from API
   const fetchStats = async () => {
@@ -23,7 +22,17 @@ function App() {
     }
   };
 
+  // Log when transactions state changes
   useEffect(() => {
+    console.log('🔄 Transactions state updated. Count:', transactions.length);
+    if (transactions.length > 0) {
+      console.log('  Most recent:', transactions[0]?.trade_id);
+    }
+  }, [transactions]);
+
+  useEffect(() => {
+    console.log('🚀 App mounting - setting up WebSocket');
+
     // Load initial data from database on mount
     fetchStats();
     fetchTransactions();
@@ -31,45 +40,54 @@ function App() {
     // Connect to WebSocket
     connectSocket();
 
+    // Set up listeners IMMEDIATELY (not waiting for connect event)
     // Listen for summary counts
     onSummaryCounts((data) => {
+      console.log('📊 Received summary_counts:', data);
       setStats(data);
     });
 
     // Listen for transaction stream (prepend to existing list)
     onTransactionStream((data) => {
+      console.log('💳 Received transaction_stream event:', data.trade_id);
       setTransactions(prev => {
-        // Check for duplicates
-        const exists = prev.some(tx => tx.trade_id === data.trade_id);
-        if (exists) return prev;
+        // Check for duplicates to prevent React key warnings
+        const existsAtIndex = prev.findIndex(tx => tx.trade_id === data.trade_id);
 
-        // Only add if matches current filter
-        const currentFilter = filterRef.current;
-        if (currentFilter !== 'all' && data.label !== currentFilter) {
-          return prev; // Don't add if doesn't match filter
+        if (existsAtIndex >= 0) {
+          console.log('🔄 Updating existing transaction:', data.trade_id, 'at index', existsAtIndex);
+          // Replace the existing transaction with the new data (might have updated fields)
+          const updated = [...prev];
+          updated[existsAtIndex] = data;
+          return updated;
         }
 
+        console.log('✅ Adding new transaction to state:', data.trade_id);
+        console.log('  Current state has', prev.length, 'transactions');
+
+        // Add new transaction at the beginning
         const newTransactions = [data, ...prev];
-        // Keep only last 10000 transactions in memory (match fetch limit)
-        return newTransactions.slice(0, 10000);
+        console.log('  New state will have', newTransactions.length, 'transactions');
+
+        // Keep only last 1000 transactions in memory
+        return newTransactions.slice(0, 1000);
       });
     });
 
+    console.log('✅ WebSocket listeners registered');
+
     // Cleanup on unmount
     return () => {
+      console.log('🔴 App unmounting - disconnecting WebSocket');
       disconnectSocket();
     };
   }, []);
 
-  // Fetch transactions from API based on filter
-  const fetchTransactions = async (label) => {
+  // Fetch ALL transactions from API (filtering done client-side)
+  const fetchTransactions = async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ limit: '10000' }); // Fetch all transactions
-      if (label && label !== 'all') {
-        params.append('label', label);
-      }
-
       const response = await fetch(`${API_BASE_URL}/api/transactions?${params.toString()}`);
       const data = await response.json();
 
@@ -103,21 +121,20 @@ function App() {
 
   const handleTotalClick = () => {
     setFilter('all');
-    filterRef.current = 'all';
-    fetchTransactions();
   };
 
   const handleLegitClick = () => {
     setFilter('legit');
-    filterRef.current = 'legit';
-    fetchTransactions('legit');
   };
 
   const handleFraudClick = () => {
     setFilter('fraud');
-    filterRef.current = 'fraud';
-    fetchTransactions('fraud');
   };
+
+  // Apply filter at display time (client-side filtering)
+  const filteredTransactions = filter === 'all'
+    ? transactions
+    : transactions.filter(tx => tx.label === filter);
 
   return (
     <div
@@ -150,7 +167,11 @@ function App() {
                 <span className="badge bg-success bg-opacity-25 text-white border border-success">
                   ● Live
                 </span>
-                <span className="text-white-50 small">{transactions.length} Transactions</span>
+                <span className="text-white-50 small">
+                  {filter === 'all'
+                    ? `${transactions.length} Transactions`
+                    : `${filteredTransactions.length} of ${transactions.length} Transactions`}
+                </span>
               </div>
             </div>
           </div>
@@ -219,7 +240,7 @@ function App() {
             <p className="mt-3 text-white">Loading transactions...</p>
           </div>
         ) : (
-          <RecentTable transactions={transactions} />
+          <RecentTable transactions={filteredTransactions} />
         )}
       </main>
 

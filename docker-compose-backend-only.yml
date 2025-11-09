@@ -82,6 +82,7 @@ services:
       KAFKA_TOPIC: transactions
       KAFKA_DLQ_TOPIC: transactions_dlq
       KAFKA_GROUP_ID: fraud-detector-group
+      SPARK_KAFKA_OFFSET: latest  # Only process NEW messages, not historical
       MONGO_URI: mongodb://mongodb:27017
       MONGO_DB: fraud_detection
       OLLAMA_BASE_URL: http://host.docker.internal:11434
@@ -117,6 +118,8 @@ services:
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_TOPIC: transactions
+      MONGO_URI: mongodb://mongodb:27017
+      MONGO_DB: fraud_detection
     networks:
       - fraud-detection-network
     restart: on-failure

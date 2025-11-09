@@ -206,7 +206,7 @@ class SparkFraudDetectionConsumer:
         """Emit updates via WebSocket"""
         try:
             # Emit transaction stream
-            self.socketio.emit('transaction_stream', {
+            transaction_data = {
                 'trade_id': doc['trade_id'],
                 'trader_id': doc['trader_id'],
                 'symbol': doc['symbol'],
@@ -218,13 +218,16 @@ class SparkFraudDetectionConsumer:
                 'confidence': doc['llama_result']['confidence'],
                 'reason': doc['llama_result']['reason'],
                 'processed_at': doc['processed_at'].isoformat() if isinstance(doc['processed_at'], datetime) else doc['processed_at']
-            })
+            }
+            self.socketio.emit('transaction_stream', transaction_data)
+            logger.info(f"✅ Emitted transaction_stream: {doc['trade_id']} ({doc['llama_result']['label']})")
 
             # Emit summary counts
             self.socketio.emit('summary_counts', stats)
+            logger.info(f"✅ Emitted summary_counts: {stats}")
 
         except Exception as e:
-            logger.error(f"Failed to emit WebSocket updates: {e}")
+            logger.error(f"❌ Failed to emit WebSocket updates: {e}")
 
     def _log_dlq(self, message: dict, error: str):
         """Log failed message (DLQ replacement)"""

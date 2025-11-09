@@ -7,6 +7,7 @@ from kafka import KafkaProducer
 from kafka.errors import KafkaError
 import sys
 import os
+from pymongo import MongoClient
 
 # Import config from backend module
 from backend.config import config
@@ -61,8 +62,47 @@ ORDER_TYPES = ['buy', 'sell']
 class TransactionProducer:
     def __init__(self):
         self.producer = None
-        self.transaction_counter = 0
-        
+        self.counter_file = '/tmp/transaction_counter.txt'
+        self.transaction_counter = self._load_counter()
+        logger.info(f"Starting from transaction counter: {self.transaction_counter}")
+
+    def _load_counter(self):
+        """Load the last transaction counter from MongoDB"""
+        try:
+            # Connect to MongoDB and get the highest transaction ID
+            client = MongoClient(config.MONGO_URI)
+            db = client[config.MONGO_DB]
+            collection = db['trade_classifications']
+
+            # Find the document with the highest trade_id
+            result = collection.find_one(
+                sort=[('trade_id', -1)],  # Sort descending
+                projection={'trade_id': 1}
+            )
+
+            if result and 'trade_id' in result:
+                # Extract number from trade_id (e.g., "TX00000123" -> 123)
+                trade_id = result['trade_id']
+                counter = int(trade_id.replace('TX', ''))
+                logger.info(f"Loaded counter from MongoDB: {counter} (last ID: {trade_id})")
+                client.close()
+                return counter
+
+            client.close()
+            logger.info("No existing transactions found in MongoDB, starting from 0")
+        except Exception as e:
+            logger.warning(f"Could not load counter from MongoDB: {e}")
+
+        return 0
+
+    def _save_counter(self):
+        """Save the current transaction counter to file"""
+        try:
+            with open(self.counter_file, 'w') as f:
+                f.write(str(self.transaction_counter))
+        except Exception as e:
+            logger.error(f"Failed to save counter: {e}")
+
     def connect(self):
         """Connect to Kafka"""
         try:
@@ -141,15 +181,18 @@ class TransactionProducer:
                 key=trade_id,
                 value=transaction
             )
-            
+
             # Wait for send to complete (blocking)
             record_metadata = future.get(timeout=10)
-            
+
             logger.info(
                 f"Sent {trade_id} - {transaction['symbol']} "
                 f"Qty: {transaction['quantity']:,} Price: ₹{transaction['price']:.2f}"
             )
-            
+
+            # Save counter after successful send
+            self._save_counter()
+
         except KafkaError as e:
             logger.error(f"Failed to send transaction: {e}")
         except Exception as e:

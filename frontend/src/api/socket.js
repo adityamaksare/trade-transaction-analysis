@@ -7,9 +7,10 @@ let socket = null;
 export const connectSocket = () => {
   if (socket?.connected) {
     console.log('Socket already connected');
-    return;
+    return socket; // Return the existing socket
   }
 
+  console.log('🔌 Creating new socket connection to:', SOCKET_URL);
   socket = io(SOCKET_URL, {
     reconnection: true,
     reconnectionDelay: 1000,
@@ -18,15 +19,15 @@ export const connectSocket = () => {
   });
 
   socket.on('connect', () => {
-    console.log('WebSocket connected');
+    console.log('✅ WebSocket connected successfully');
   });
 
   socket.on('disconnect', (reason) => {
-    console.log('WebSocket disconnected:', reason);
+    console.log('🔴 WebSocket disconnected:', reason);
   });
 
   socket.on('connect_error', (error) => {
-    console.error('WebSocket connection error:', error);
+    console.error('❌ WebSocket connection error:', error);
   });
 
   return socket;
@@ -41,15 +42,23 @@ export const disconnectSocket = () => {
 };
 
 export const onSummaryCounts = (callback) => {
-  if (!socket) return;
+  if (!socket) {
+    console.warn('⚠️ onSummaryCounts called but socket is null');
+    return;
+  }
   // Remove all previous listeners before adding new one
   socket.off('summary_counts');
   socket.on('summary_counts', callback);
+  console.log('✅ summary_counts listener registered');
 };
 
 export const onTransactionStream = (callback) => {
-  if (!socket) return;
+  if (!socket) {
+    console.warn('⚠️ onTransactionStream called but socket is null');
+    return;
+  }
   // Remove all previous listeners before adding new one
   socket.off('transaction_stream');
   socket.on('transaction_stream', callback);
+  console.log('✅ transaction_stream listener registered');
 };
