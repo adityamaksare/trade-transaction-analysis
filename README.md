@@ -62,8 +62,8 @@ This system simulates and detects fraudulent stock transactions in **real-time**
 
 **What You'll See:**
 
-- **Real-time Statistics**: Total, Legitimate, and Fraudulent transaction counters updating every 15 seconds
-- **Live Transaction Stream**: New transactions appearing instantly with AI classifications
+- **Real-time Statistics**: Total, Legitimate, and Fraudulent transaction counters updating every 6 seconds (10 tx/min)
+- **Live Transaction Stream**: New transactions appearing instantly with AI classifications via atomic WebSocket updates
 - **Color-coded Rows**: Green for legitimate (✅), Red for fraudulent (⚠️)
 - **Confidence Scores**: AI confidence levels (0-100%)
 - **Reasoning**: Why each transaction was classified as fraud or legit
@@ -91,11 +91,11 @@ This system simulates and detects fraudulent stock transactions in **real-time**
 │    Price Ranges  │         │  └──────────────────────────────────┘    │
 │  • Fraud         │         │                ↓                          │
 │    Patterns      │         │  ┌──────────────────────────────────┐    │
-│  • Every 15s     │         │  │  PySpark Streaming Consumer      │    │
-│                  │         │  │  - 1-second micro-batches        │    │
-│                  │         │  │  - Automatic checkpointing       │    │
-└──────────────────┘         │  │  - Retry logic (3 attempts)      │    │
-                             │  │  - Deduplication tracking        │    │
+│  • Every 6s      │         │  │  PySpark Streaming Consumer      │    │
+│  • MongoDB ID    │         │  │  - 1-second micro-batches        │    │
+│    Persistence   │         │  │  - Automatic checkpointing       │    │
+│                  │         │  │  - Retry logic (3 attempts)      │    │
+└──────────────────┘         │  │  - Deduplication tracking        │    │
                              │  └──────────────────────────────────┘    │
                              │                ↓                          │
                              │  ┌──────────────────────────────────┐    │
@@ -189,7 +189,8 @@ Dashboard updates: Counters + New row in table (red border)
 
 ### 📊 Modern React Dashboard
 
-- **Real-time WebSocket updates** (<500ms latency)
+- **Atomic WebSocket updates** - Counter and table update simultaneously in single render cycle
+- **Real-time updates** (<4s end-to-end latency from generation to display)
 - **Interactive statistics cards** (click to filter transactions)
 - **Color-coded table** with hover effects
 - **Filter-aware WebSocket** (only shows matching transactions)
@@ -343,7 +344,7 @@ This starts:
 - ✅ Kafka (message broker on port 9092)
 - ✅ MongoDB (database on port 27017)
 - ✅ Backend API (Flask + WebSocket on port 5001)
-- ✅ Producer (generates 4 transactions/minute)
+- ✅ Producer (generates 10 transactions/minute with MongoDB ID persistence)
 
 ### Step 3: Start Frontend
 
@@ -389,7 +390,7 @@ fraud-detection-system/
 │   └── .dockerignore                # Docker build optimization
 │
 ├── producer/                         # Transaction generator
-│   ├── producer.py                  # Kafka producer (4 tx/min, ~25% fraud)
+│   ├── producer.py                  # Kafka producer (10 tx/min, ~25% fraud, MongoDB ID persistence)
 │   └── Dockerfile                   # Producer container image
 │
 ├── frontend/                         # React frontend (JavaScript)
@@ -421,7 +422,13 @@ fraud-detection-system/
 
 ### 1. Transaction Generation (Producer)
 
-The producer generates realistic transactions with **intentional fraud patterns** (~25%):
+The producer generates realistic transactions with **intentional fraud patterns** (~25%) and maintains **transaction ID persistence** via MongoDB:
+
+**ID Persistence:**
+- On startup, queries MongoDB for the highest `trade_id` (e.g., `TX00000567`)
+- Extracts the counter value (567) and continues from there
+- Prevents ID collisions and data loss across restarts
+- Ensures transaction history grows continuously without resets
 
 **Fraud Pattern Distribution:**
 - **75%** - Normal/Legitimate: 100-75,000 shares, 0.6x-2.5x typical price
@@ -448,7 +455,8 @@ Transactions flow through Kafka topic `transactions`:
 - **Key**: trade_id (for partition distribution)
 - **Value**: JSON transaction
 - **Acknowledgment**: Waits for broker confirmation
-- **Interval**: Every 15 seconds (4 transactions/minute)
+- **Interval**: Every 6 seconds (10 transactions/minute)
+- **ID Persistence**: Loads highest transaction ID from MongoDB on startup to maintain continuity
 
 **Why Kafka?**
 - **Scalability**: Handle millions of messages
@@ -581,12 +589,28 @@ Frontend receives updates via WebSocket:
 
 **WebSocket Events:**
 
-1. **`summary_counts`** - Emitted on connect and after each classification
+1. **`transaction_update`** - Primary atomic event emitted after each classification (NEW)
+   ```json
+   {
+     "stats": { "total": 1250, "legit": 950, "fraud": 300 },
+     "transaction": {
+       "trade_id": "TX00000042",
+       "symbol": "RELIANCE",
+       "label": "fraud",
+       "confidence": 0.95,
+       "reason": "Large quantity combined with high price...",
+       ...
+     }
+   }
+   ```
+   *Frontend updates both counter and transaction table atomically in one render cycle*
+
+2. **`summary_counts`** - Emitted on connect and after each classification (backward compatibility)
    ```json
    { "total": 1250, "legit": 950, "fraud": 300 }
    ```
 
-2. **`transaction_stream`** - Emitted after each classification
+3. **`transaction_stream`** - Emitted after each classification (backward compatibility)
    ```json
    {
      "trade_id": "TX00000042",
@@ -678,6 +702,7 @@ GET /api/transactions?limit=100&skip=0&label=fraud
 
 #### Server → Client Events
 
+- **`transaction_update`** - Primary atomic event combining stats and transaction (recommended)
 - **`summary_counts`** - Emitted on connect and after each classification
 - **`transaction_stream`** - Emitted after each classification
 
@@ -903,21 +928,29 @@ npm start  # Auto-reloads on changes
 
 | Metric | Average | Description |
 |--------|---------|-------------|
-| **Transaction Generation** | 15s | Producer interval (4 tx/min) |
+| **Transaction Generation** | 6s | Producer interval (10 tx/min) |
 | **Kafka Delivery** | <50ms | Producer to broker |
 | **PySpark Micro-batch** | 1s | Batch trigger interval |
-| **LLM Classification** | 200-500ms | Llama3 inference (per tx) |
+| **LLM Classification** | 2.5-3.5s | Llama3 inference (per tx) on M4 chip |
 | **MongoDB Write** | <10ms | Insert + stats update |
-| **WebSocket Broadcast** | <5ms | Backend to frontend |
-| **End-to-End** | ~1-2s | Kafka to dashboard |
+| **WebSocket Broadcast** | <5ms | Backend to frontend (atomic updates) |
+| **End-to-End** | ~3-4s | Kafka to dashboard |
 
 ### Throughput
 
-- **Current**: 4 transactions/minute (15s interval)
-- **Configurable**: Change in `producer/producer.py:188`
+- **Current**: 10 transactions/minute (6s interval)
+- **Optimized for**: MacBook Air M4 chip with Llama3:8b
+- **Configurable**: Change in `producer/producer.py:231`
   ```python
-  producer.start(interval=10.0)  # 10s = 6 tx/min
+  producer.start(interval=6.0)   # 6s = 10 tx/min (current)
+  producer.start(interval=3.0)   # 3s = 20 tx/min (aggressive)
+  producer.start(interval=15.0)  # 15s = 4 tx/min (conservative)
   ```
+
+**Performance Notes:**
+- Processing time (~4s) < Generation interval (6s) = No queue buildup
+- M4 chip handles 10 tx/min comfortably with plenty of headroom
+- Can safely increase to 15-20 tx/min if needed
 
 ### Resource Usage
 

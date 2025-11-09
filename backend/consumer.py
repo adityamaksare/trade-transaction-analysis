@@ -205,7 +205,7 @@ class SparkFraudDetectionConsumer:
     def _emit_updates(self, doc: dict, stats: dict):
         """Emit updates via WebSocket"""
         try:
-            # Emit transaction stream
+            # Prepare transaction data
             transaction_data = {
                 'trade_id': doc['trade_id'],
                 'trader_id': doc['trader_id'],
@@ -219,12 +219,18 @@ class SparkFraudDetectionConsumer:
                 'reason': doc['llama_result']['reason'],
                 'processed_at': doc['processed_at'].isoformat() if isinstance(doc['processed_at'], datetime) else doc['processed_at']
             }
-            self.socketio.emit('transaction_stream', transaction_data)
-            logger.info(f"✅ Emitted transaction_stream: {doc['trade_id']} ({doc['llama_result']['label']})")
 
-            # Emit summary counts
+            # Combine both updates into a single event for atomic frontend update
+            combined_update = {
+                'stats': stats,
+                'transaction': transaction_data
+            }
+            self.socketio.emit('transaction_update', combined_update)
+            logger.info(f"✅ Emitted transaction_update: {doc['trade_id']} ({doc['llama_result']['label']}) | Stats: {stats}")
+
+            # Also emit individual events for backward compatibility
             self.socketio.emit('summary_counts', stats)
-            logger.info(f"✅ Emitted summary_counts: {stats}")
+            self.socketio.emit('transaction_stream', transaction_data)
 
         except Exception as e:
             logger.error(f"❌ Failed to emit WebSocket updates: {e}")

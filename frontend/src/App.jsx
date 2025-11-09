@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Counters from './components/Counters';
 import RecentTable from './components/RecentTable';
-import { connectSocket, disconnectSocket, onSummaryCounts, onTransactionStream } from './api/socket';
+import { connectSocket, disconnectSocket, onSummaryCounts, onTransactionStream, onTransactionUpdate } from './api/socket';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5001';
 
@@ -70,6 +70,27 @@ function App() {
         console.log('  New state will have', newTransactions.length, 'transactions');
 
         // Keep only last 1000 transactions in memory
+        return newTransactions.slice(0, 1000);
+      });
+    });
+
+    // Listen for combined transaction update (atomic update of both stats and transaction)
+    onTransactionUpdate((data) => {
+      console.log('🔄 Received transaction_update (atomic):', data.transaction.trade_id, '| Stats:', data.stats);
+
+      // Update stats and transaction atomically in the same handler
+      setStats(data.stats);
+
+      setTransactions(prev => {
+        const existsAtIndex = prev.findIndex(tx => tx.trade_id === data.transaction.trade_id);
+
+        if (existsAtIndex >= 0) {
+          const updated = [...prev];
+          updated[existsAtIndex] = data.transaction;
+          return updated;
+        }
+
+        const newTransactions = [data.transaction, ...prev];
         return newTransactions.slice(0, 1000);
       });
     });

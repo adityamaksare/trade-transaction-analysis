@@ -62,3 +62,14 @@ export const onTransactionStream = (callback) => {
   socket.on('transaction_stream', callback);
   console.log('✅ transaction_stream listener registered');
 };
+
+export const onTransactionUpdate = (callback) => {
+  if (!socket) {
+    console.warn('⚠️ onTransactionUpdate called but socket is null');
+    return;
+  }
+  // Remove all previous listeners before adding new one
+  socket.off('transaction_update');
+  socket.on('transaction_update', callback);
+  console.log('✅ transaction_update listener registered (combined stats + transaction)');
+};

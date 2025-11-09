@@ -228,7 +228,7 @@ def main():
 
     try:
         producer.connect()
-        producer.start(interval=15.0)  # 4 transactions per minute
+        producer.start(interval=6.0)  # 10 transactions per minute
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         sys.exit(1)
